@@ -1,6 +1,18 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 
+// 구 앱 메뉴 8개 (그룹 구분선 위치: 거래처관리 앞, 주문관리 앞, 우리회사 앞)
+const NAV_ITEMS = [
+  { href: '/main', label: 'Main 화면', group: false },
+  { href: '/customers', label: '거래처 관리', group: true },
+  { href: '/trading-stubs', label: '거래명세표 관리', group: false },
+  { href: '/e-tax-bill', label: '세금계산서 관리', group: false },
+  { href: '/orders', label: '주문 관리', group: true },
+  { href: '/ready-made-order', label: '기성품 주문', group: false },
+  { href: '/custom-order', label: '맞춤품 주문', group: false },
+  { href: '/my-company', label: '우리 회사 관리', group: true },
+]
+
 export default async function ProtectedLayout({
   children,
 }: {
@@ -13,7 +25,6 @@ export default async function ProtectedLayout({
     redirect('/login')
   }
 
-  // users + companies JOIN으로 사용자 정보 조회
   const { data: dbUser } = await supabase
     .from('users')
     .select(`
@@ -36,7 +47,6 @@ export default async function ProtectedLayout({
     redirect('/waiting')
   }
 
-  // companies 데이터 타입 처리
   const company = Array.isArray(dbUser.companies)
     ? dbUser.companies[0]
     : dbUser.companies
@@ -46,38 +56,72 @@ export default async function ProtectedLayout({
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="sticky top-0 z-50 border-b bg-white shadow-sm">
-        <div className="flex h-14 items-center justify-between px-4">
-          <div className="flex items-center gap-4">
-            <h1 className="text-lg font-bold text-blue-600">신비서</h1>
-            <nav className="hidden md:flex items-center gap-1">
-              <a href="/main" className="px-3 py-2 text-sm rounded-md hover:bg-gray-100">메인</a>
-              <a href="/my-company" className="px-3 py-2 text-sm rounded-md hover:bg-gray-100">내 회사</a>
-              <a href="/billing" className="px-3 py-2 text-sm rounded-md hover:bg-gray-100">청구서</a>
-              <a href="/trading-stub-print" className="px-3 py-2 text-sm rounded-md hover:bg-gray-100">거래명세표</a>
-              <a href="/e-tax-bill" className="px-3 py-2 text-sm rounded-md hover:bg-gray-100">전자세금계산서</a>
-            </nav>
-          </div>
-          <div className="flex items-center gap-3 text-sm">
-            <span className="hidden sm:inline text-muted-foreground">
-              {company.company_name}
-              <span className="ml-1 text-xs">({company.power})</span>
+    <div className="min-h-screen" style={{ fontFamily: "'Nanum Gothic', sans-serif", fontSize: '14px' }}>
+      {/* 헤더 - 구 앱 스타일 (cornflowerblue 배경) */}
+      <header className="sticky top-0 z-50">
+        {/* 상단 타이틀 바 */}
+        <div
+          className="flex items-center justify-between px-4"
+          style={{ backgroundColor: 'cornflowerblue', height: '62px' }}
+        >
+          <div className="flex items-center gap-3">
+            {/* 로고 자리 */}
+            <div
+              className="flex items-center justify-center rounded"
+              style={{ width: '50px', height: '50px', backgroundColor: 'rgba(255,255,255,0.2)' }}
+            >
+              <span className="text-white font-bold text-lg">신</span>
+            </div>
+            <span style={{ fontSize: '25px', color: 'white', fontWeight: 'bold' }}>
+              신BS - 포장자재 온라인 도매시장
             </span>
-            <span className="font-medium">{dbUser.user_name}</span>
-            <span className="text-xs text-muted-foreground">({dbUser.power})</span>
-            <form action="/api/auth/signout" method="post">
-              <button type="submit" className="text-sm text-gray-500 hover:text-gray-700">
+          </div>
+          <div className="flex items-center gap-2" style={{ color: 'silver' }}>
+            <span>{company.company_name}({dbUser.power})</span>
+            <form action="/api/auth/signout" method="post" className="ml-2">
+              <button
+                type="submit"
+                className="px-2 py-1 rounded text-xs"
+                style={{ backgroundColor: 'rgba(255,255,255,0.2)', color: 'white' }}
+              >
                 로그아웃
               </button>
             </form>
           </div>
         </div>
+
+        {/* 메뉴 네비게이션 바 - 구 앱 whitesmoke + cornflowerblue 테두리 */}
+        <nav
+          className="overflow-x-auto"
+          style={{
+            backgroundColor: 'whitesmoke',
+            borderTop: 'thin solid cornflowerblue',
+            borderBottom: 'thin solid cornflowerblue',
+          }}
+        >
+          <div className="flex max-w-[1500px] mx-auto">
+            {NAV_ITEMS.map((item) => (
+              <a
+                key={item.href}
+                href={item.href}
+                className="flex-1 text-center py-2 hover:bg-gray-200 transition-colors"
+                style={{
+                  color: 'darkslateblue',
+                  fontWeight: 'bold',
+                  fontSize: '14px',
+                  borderLeft: item.group ? 'thin solid cornflowerblue' : 'none',
+                  minWidth: '0',
+                }}
+              >
+                {item.label}
+              </a>
+            ))}
+          </div>
+        </nav>
       </header>
 
-      {/* Main Content */}
-      <main className="p-4">
+      {/* 콘텐츠 - 구 앱 max-width 1500px */}
+      <main className="max-w-[1500px] mx-auto p-2">
         {children}
       </main>
     </div>

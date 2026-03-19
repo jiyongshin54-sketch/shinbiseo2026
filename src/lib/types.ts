@@ -231,6 +231,10 @@ export interface DisplayBoardOrder extends OrderMaster {
   orderer_name?: string
   seller_name?: string      // 구매회사용
   seller_alias?: string
+  representative_item?: string  // 대표물건
+  ready_name?: string
+  receive_name?: string
+  finish_name?: string
 }
 
 // ===== 장바구니 아이템 =====

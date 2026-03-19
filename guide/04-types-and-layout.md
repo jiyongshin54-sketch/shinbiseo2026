@@ -1,265 +1,218 @@
-# Step 3: 타입 정의 + 권한 훅 + 공통 레이아웃
+# Step 3: 타입 정의 + 권한 체계 + 레이아웃 (소스 분석 기준)
+
+## 권한 체계 상세 (Main.aspx.cs 소스 분석)
+
+### Session 변수 → Supabase Auth 매핑
+| Session 변수 | 용도 | Next.js 대체 |
+|---|---|---|
+| Session["MyID"] | Google ID (21자리) | useAuth().userInfo.userId |
+| Session["MyCompanyID"] | 회사 ID | useAuth().userInfo.companyId |
+| Session["MyName"] | 사용자 이름 | useAuth().userInfo.userName |
+| Session["MyPower"] | 직위 (대표/관리자/직원) | useAuth().userInfo.userPower |
+| Session["MyStatus"] | 승인 상태 | useAuth().userInfo.status |
+| Session["CartTable"] | 장바구니 DataTable | useCartStore() (zustand) |
+
+### 판매/구매 판별
+- **회사의 Power 필드**로 결정 (사용자 Power 아님!)
+- `ShinbsDB.GetCompanyFieldName(companyId, "Power")` = "판매" 또는 "구매"
+- useAuth().userInfo.companyPower로 접근
+
+---
+
+## 권한별 기능 접근 매트릭스 (Main.aspx.cs 분석 결과)
+
+### 전광판 (todayGV)
+| 기능 | 판매-대표 | 판매-관리자 | 판매-직원 | 구매-대표 | 구매-관리자 | 구매-직원 |
+|---|---|---|---|---|---|---|
+| 전광판 조회 | O | O | O | O | O | O |
+| **금액 컬럼** | **실제 금액** | **\*\*\*\*\*** | **\*\*\*\*\*** | **실제 금액** | **실제 금액** | **실제 금액** |
+| 명세표 발행 버튼 | O | O | O | X (숨김) | X (숨김) | X (숨김) |
+| 자동Refresh 버튼 | O | O | O | X (숨김) | X (숨김) | X (숨김) |
+| 새 주문 알림(Alarm) | O | O | O | X | X | X |
+
+> **핵심**: 금액 마스킹은 "판매회사 + 대표가 아닌 경우"만! 구매회사는 직위 무관 금액 표시.
+
+### 전광판 상세 (거래현황DetailPH)
+| 기능 | 판매 | 구매 |
+|---|---|---|
+| 거래일자 수정 | O (Enabled) | X (Disabled) |
+| 품목별 준비/재고없음 버튼 | O | X (Disabled) |
+| 수령 확인 | X | O |
+| 대리 수령 확인 | O (판매사만) | X |
+| 결제 확인 | O (판매사만) | X |
+| 주문 취소 | 본인 주문만 | X |
+
+### 거래처 관리
+| 기능 | 대표 | 관리자 | 직원 |
+|---|---|---|---|
+| 거래처 목록 조회 | O | O | X ("대표/관리자만 볼 수 있습니다") |
+| 거래처 상세 수정 | O | O | X |
+| 미수금 관리 패널 | O (판매만) | O (판매만) | O (판매만) |
+
+> **핵심**: 구매회사는 미수금 패널이 숨겨짐 (미수금은 판매사 기능)
+
+### 거래명세표/세금계산서 관리
+| 기능 | 판매 | 구매 |
+|---|---|---|
+| 거래명세표 관리 | O (특정 회사만) | X ("개발중" 메시지) |
+| 세금계산서 관리 | O (특정 회사만) | X ("개발중" 메시지) |
+
+### 주문 관리 (검색)
+| 기능 | 대표 | 관리자/직원 |
+|---|---|---|
+| 거래처 미선택 전체조회 | O | X (거래처 필수) |
+| [수정] 버튼 | O (모든 주문) | 본인 주문만 |
+| 일괄 확인(결제) | O (판매만) | O (판매만) |
+
+### 기성품/맞춤품 주문
+| 기능 | 판매 | 구매 |
+|---|---|---|
+| 구분 DDL | 판매/구매 선택 가능 | "구매" 고정 (readonly) |
+| 거래일자 수정 | O | X (readonly) |
+| 금액조정 수정 | O | X (readonly) |
+| 상태 DDL | O (주문/견적/준비됨 등) | X (숨김) |
+| 주문 등록 | O | O |
+| 주문 수정 | O | X |
+
+### 우리 회사 관리
+| 기능 | 대표 | 관리자 | 직원 |
+|---|---|---|---|
+| 회사정보 조회 | O | O | O |
+| 회사정보 수정 | O | X (수정 버튼 숨김) | X |
+| 직원 목록 | O | X (빈 목록) | X (빈 목록) |
+| 직원 승인/삭제 | O | X | X |
+
+### 풍원 딜러네트워크
+| 기능 | 풍원 소속 | 계약 구매회사 |
+|---|---|---|
+| 기성품 주문 | O | O |
+| 맞춤품 주문 | O | O (견적요청만) |
+| 기성품 단가표 | 전체 13등급 단가 | 자기 등급 단가만 |
+| 상품 관리 (풍원상품PH) | O | X (숨김) |
+
+---
+
+## 구매회사 관점에서의 핵심 차이
+
+구매회사는 판매회사에 비해:
+
+1. **전광판**: 자동Refresh 없음, 명세표 발행 버튼 없음, 금액은 항상 표시
+2. **거래처 관리**: 미수금 패널 숨김 (미수금은 판매사가 관리)
+3. **거래명세표/세금계산서**: "개발중" 메시지 (현재 판매사 전용)
+4. **주문**: 구분 DDL이 "구매" 고정, 거래일자/금액조정 수정 불가, 상태 DDL 숨김
+5. **주문 상세**: 준비/재고없음 불가, 대신 수령 확인 가능
+6. **풍원/오픈패키지**: 딜러네트워크에서 직접 기성품 주문 + 견적 요청 가능
+
+---
+
+## 특수 사용자
+- `ShinbsDB.ShinID` / `ShinbsDB.WonID`: 시스템 관리자
+  - Main 화면에 "새 회사 승인" (ShinBSPH) 패널 표시
+  - 가입 회사 승인/삭제, 전체 직원 관리
+  - → 나중에 별도 관리자 페이지로 구현 예정
+
+---
 
 ## TypeScript 타입 정의 (src/lib/types.ts)
 
-### DB 테이블 타입
+### Company
 ```typescript
-// Companies
-export interface Company {
-  company_id: string
+interface Company {
+  company_id: string       // varchar(5), zero-padded
   company_name: string
-  business_id: string | null
-  owner_name: string | null
-  phone_number: string | null
-  fax_number: string | null
-  email_address: string | null
-  contact_id: string | null
-  uptae: string | null
-  jongmok: string | null
-  address: string | null
-  homepage: string | null
-  account: string | null
-  comment: string | null
-  power: '구매' | '판매'
-  status: '승인' | '신청' | '삭제'
-  request_time: string | null
-  approve_id: string | null
-  approve_time: string | null
-  company_alias: string | null
-  issue_ti: string | null
+  business_id: string      // 사업자번호
+  owner_name: string
+  phone_number: string
+  fax_number: string
+  email_address: string
+  contact_id: string       // Google ID (연락 담당자)
+  uptae: string            // 업태
+  jongmok: string          // 종목
+  address: string
+  homepage: string
+  account: string          // 계좌정보
+  comment: string
+  power: '판매' | '구매'
+  status: '승인' | '신청'
+  request_time: string
+  approve_id: string
+  approve_time: string
+  company_alias: string
+  issue_ti: string | null  // '발행' | null
 }
+```
 
-// Users
-export interface User {
-  user_id: string
-  auth_uid: string | null
-  user_name: string | null
-  mobile_number: string | null
-  company_id: string | null
+### User
+```typescript
+interface User {
+  user_id: string          // Google ID (21자리)
+  auth_uid: string         // Supabase UUID
+  user_name: string
+  mobile_number: string
+  company_id: string
   power: '대표' | '관리자' | '직원'
   status: '승인' | '신청' | '삭제'
-  request_time: string | null
-  approve_id: string | null
-  approve_time: string | null
-  email_address: string | null
+  request_time: string
+  approve_id: string
+  approve_time: string
+  email_address: string
 }
+```
 
-// Customers
-export interface Customer {
+### Customer
+```typescript
+interface Customer {
   seller_id: string
   customer_id: string
-  company_id: string | null
-  customer_name: string | null
-  business_id: string | null
-  owner_name: string | null
-  phone_number: string | null
-  fax_number: string | null
-  email_address: string | null
-  contact_name: string | null
-  uptae: string | null
-  jongmok: string | null
-  address: string | null
-  homepage: string | null
-  account: string | null
-  comment: string | null
-  status: string | null
-  register_id: string | null
-  register_time: string | null
-  last_modify_id: string | null
-  last_modify_time: string | null
-  level1: string | null
-  level2: string | null
-  level3: string | null
-  payment: string | null
-  issue_vat: string | null
-}
-
-// Orders (Master + Detail)
-export interface OrderMaster { ... }
-export interface OrderDetail { ... }
-
-// Products
-export interface Product { ... }
-
-// Categories
-export interface Category {
-  category_id: string
-  category_l: string | null
-  category_m: string | null
-  category_s: string | null
-}
-
-// TradingStubs
-export interface TradingStubMaster { ... }
-export interface TradingStubDetail { ... }
-
-// Contracts
-export interface Contract { ... }
-```
-
-### 권한 관련 타입
-```typescript
-export type CompanyPower = '구매' | '판매'
-export type UserPower = '대표' | '관리자' | '직원'
-
-export interface AuthUser {
-  authUid: string
-  userId: string
-  userName: string
-  mobileNumber: string
-  emailAddress: string
-  companyId: string
-  companyName: string
-  companyAlias: string
-  companyPower: CompanyPower
-  userPower: UserPower
-}
-
-// 등급 (가격 산정용)
-export const PRICE_GRADES = [
-  '3.8급', '3.9급', '4.0급', '4.1급', '4.2급',
-  '4.3급', '4.4급', '4.5급', '4.6급', '4.7급',
-  '4.8급', '4.9급', '5.0급'
-] as const
-export type PriceGrade = typeof PRICE_GRADES[number]
-
-// 등급 → UnitPrice 컬럼 인덱스 매핑
-export const GRADE_TO_PRICE_INDEX: Record<PriceGrade, number> = {
-  '3.8급': 1, '3.9급': 2, '4.0급': 3, '4.1급': 4,
-  '4.2급': 5, '4.3급': 6, '4.4급': 7, '4.5급': 8,
-  '4.6급': 9, '4.7급': 10, '4.8급': 11, '4.9급': 12,
-  '5.0급': 13,
+  company_id: string       // Companies 매핑 (가입시)
+  customer_name: string
+  business_id: string
+  owner_name: string
+  phone_number: string
+  fax_number: string
+  email_address: string
+  contact_name: string
+  uptae: string
+  jongmok: string
+  address: string
+  homepage: string
+  account: string
+  comment: string
+  status: string
+  level1: string           // 일반등급 (3.8급~5.0급)
+  level2: string           // 마대등급
+  level3: string           // 맞춤품 등급
+  payment: string          // 결제방식 (일결제/월결제)
+  issue_vat: string        // 세금계산서 (발행/미발행)
 }
 ```
 
-## 상수 정의 (src/lib/constants.ts)
+### OrderMaster / OrderDetail / Product / Category 등
+(기존 types.ts 참조)
 
-```typescript
-// 주문 상태 (전체)
-export const ORDER_STATUS = {
-  // 맞춤품 전용 (기성품은 바로 '주문'으로 시작)
-  QUOTE_REQUEST: '견적 요청',     // 맞춤품만
-  QUOTE_RESPONSE: '견적 응답',    // 맞춤품만
-  // 공통
-  ORDERED: '주문',
-  PARTIAL_READY: '일부 준비됨',
-  ALL_READY: '전부 준비됨',
-  READY: '준비됨',
-  WAITING_STOCK: '입고 대기중',
-  NO_STOCK: '재고없음',          // OrdersD 개별 품목 전용
-  RECEIVED: '수령',
-  FINISHED: '완료',
-  // 취소 상태
-  QUOTE_CANCELLED: '견적 취소',   // 맞춤품만
-  ORDER_CANCELLED: '주문 취소',
-  READY_CANCELLED: '준비됨 취소',
-  RECEIVE_CANCELLED: '수령 취소',
-  FINISH_CANCELLED: '완료 취소',
-} as const
+---
 
-// 회사 권한
-export const COMPANY_POWER = {
-  BUYER: '구매',
-  SELLER: '판매',
-} as const
+## 공통 레이아웃 (Protected Layout)
 
-// 사용자 권한
-export const USER_POWER = {
-  OWNER: '대표',
-  ADMIN: '관리자',
-  STAFF: '직원',
-} as const
-
-// 승인 상태
-export const APPROVAL_STATUS = {
-  APPROVED: '승인',
-  PENDING: '신청',
-  DELETED: '삭제',
-} as const
-
-// 하드코딩 판매회사 (클론코딩용, 추후 범용화)
-export const SELLER_COMPANIES = {
-  PUNGWON: '00002',
-  REGROUND: '00046',
-} as const
+### 헤더
 ```
-
-## 권한 훅
-
-### useCompanyPower
-```typescript
-// 현재 사용자의 회사가 판매/구매인지 판별
-// 반환: { isSeller, isBuyer, companyPower }
+[로고] 신BS - 포장자재 온라인 도매시장          회사명(권한)
 ```
+- 배경: cornflowerblue
+- 로고: shinbs.jpg, 높이 62px
+- 타이틀: font-size:25px, color:white, font-weight:bold
+- 우측: whoami 라벨 (회사명+권한), color:silver
 
-### useUserPower
-```typescript
-// 현재 사용자의 역할(대표/관리자/직원) 판별
-// 반환: { isOwner, isAdmin, isStaff, userPower }
+### 메뉴 탭 (8개)
 ```
-
-### usePermission (복합 권한)
-```typescript
-// 특정 기능의 접근 가능 여부를 판별
-// 실제 코드 분석 기반 (Main.aspx.cs, MyCompany.aspx.cs)
-interface Permissions {
-  // 회사 권한 (companies.power) 기반
-  canCreateOrder: boolean       // 판매+구매 모두 가능
-  canPrepareItems: boolean      // 판매만 (품목별 준비)
-  canConfirmReceive: boolean    // 구매 (수령 확인) + 판매 (대리 수령)
-  canConfirmPayment: boolean    // 판매만 (결제/완료 처리)
-  canManageProducts: boolean    // 판매만
-  canIssueTradingStub: boolean  // 판매만
-  canAutoRefresh: boolean       // 판매만 (전광판 30초 자동 리프레시)
-
-  // 사용자 권한 (users.power) 기반 — 판매+구매 공통 적용
-  canViewCustomers: boolean     // 대표/관리자만 (직원 X)
-  canSearchAllOrders: boolean   // 대표만 (관리자/직원은 거래처 선택 필수)
-  canEditCompany: boolean       // 대표만
-  canManageStaff: boolean       // 대표만 (직원 목록 조회/삭제)
-
-  // 사용자 권한 — 판매회사 전용 추가 체크
-  canViewAmountInList: boolean  // 판매+대표만 (그 외 ***** 마스킹)
-  canActOnOthersOrder: boolean  // 판매+대표만 (관리자/직원은 자기 주문만)
-}
+Main 화면 | 거래처 관리 | 거래명세표 관리 | 세금계산서 관리 | 주문 관리 | 기성품 주문 | 맞춤품 주문 | 우리 회사 관리
 ```
+- 배경: whitesmoke
+- 테두리: cornflowerblue solid thin
+- 텍스트: darkslateblue
+- 각 탭: width:10%, text-align:center
+- 그룹 구분선: 거래처관리 앞, 주문관리 앞, 우리회사 앞에 border-left
 
-## 공통 레이아웃
-
-### Protected Layout (src/app/(protected)/layout.tsx)
-```
-┌─────────────────────────────────────────────┐
-│ Header                                       │
-│ [로고] [회사명]          [사용자명] [로그아웃] │
-├──────┬──────────────────────────────────────┤
-│ Side │ Main Content                          │
-│ bar  │                                       │
-│      │                                       │
-│ 메인 │                                       │
-│ 내회사│                                      │
-│ 청구서│                                      │
-│ 거래표│                                      │
-│ ...  │                                       │
-└──────┴──────────────────────────────────────┘
-```
-
-### 네비게이션 항목 (권한별)
-| 메뉴 | 판매 | 구매 | 비고 |
-|------|------|------|------|
-| 메인 | O | O | |
-| 내 회사 | O | O | |
-| 청구서 | O | O | |
-| 거래명세표 | O | O | |
-| 전자세금계산서 | O | O | |
-| 풍원 | O (00002만) | O (계약시) | 클론코딩 |
-| 리그라운드 | O (00046만) | O (계약시) | 클론코딩 |
-
-## 완료 체크리스트
-- [ ] types.ts 전체 타입 정의
-- [ ] constants.ts 상수 정의
-- [ ] useAuth 훅 완성
-- [ ] useCompanyPower 훅
-- [ ] useUserPower 훅
-- [ ] usePermission 훅
-- [ ] Protected layout (Header + Sidebar)
-- [ ] 반응형 레이아웃 (모바일 햄버거 메뉴)
+### 콘텐츠
+- max-width: 1500px, margin:auto
+- padding: 적절한 여백

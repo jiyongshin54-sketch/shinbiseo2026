@@ -3,18 +3,6 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useAuth } from '@/hooks/use-auth'
 import { useCartStore } from '@/stores/cart-store'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
 import { Cart } from './cart'
 import { SELLER_COMPANIES } from '@/lib/constants'
 import type { Customer } from '@/lib/types'
@@ -47,21 +35,14 @@ export function ReadyMadeOrder() {
   const { user, isSeller, isBuyer } = useAuth()
   const cart = useCartStore()
 
-  // 거래 대상 선택
   const [customers, setCustomers] = useState<Customer[]>([])
   const [sellers, setSellers] = useState<SellerOption[]>([])
   const [selectedCustomerId, setSelectedCustomerId] = useState('')
   const [selectedSellerId, setSelectedSellerId] = useState('')
-
-  // 상품 검색
   const [searchKeyword, setSearchKeyword] = useState('')
   const [products, setProducts] = useState<ProductWithPrice[]>([])
   const [productsLoading, setProductsLoading] = useState(false)
-
-  // 수량 입력 (제품별)
   const [quantities, setQuantities] = useState<Record<string, string>>({})
-
-  // 주문 상태 (판매회사용)
   const [orderStatus, setOrderStatus] = useState('주문')
 
   // 판매회사 → 고객 목록 로드
@@ -69,22 +50,17 @@ export function ReadyMadeOrder() {
     if (!user || !isSeller) return
     fetch(`/api/customers?seller_id=${user.companyId}`)
       .then(res => res.json())
-      .then(data => {
-        if (Array.isArray(data)) setCustomers(data)
-      })
+      .then(data => { if (Array.isArray(data)) setCustomers(data) })
   }, [user, isSeller])
 
   // 구매회사 → 계약된 판매회사 목록 로드
   useEffect(() => {
     if (!user || !isBuyer) return
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-    // contracts에서 buyer_id = 내 회사인 판매회사 목록
     fetch(`/api/contracts?buyer_id=${user.companyId}`)
       .then(res => res.json())
       .then(data => {
         if (Array.isArray(data)) {
           setSellers(data)
-          // 기본값: 풍원
           const pungwon = data.find((s: SellerOption) => s.seller_id === SELLER_COMPANIES.PUNGWON)
           if (pungwon) setSelectedSellerId(pungwon.seller_id)
           else if (data.length > 0) setSelectedSellerId(data[0].seller_id)
@@ -97,7 +73,6 @@ export function ReadyMadeOrder() {
   const activeCustomerId = isSeller ? selectedCustomerId : undefined
   const activeBuyerCompanyId = isBuyer ? user?.companyId : undefined
 
-  // 상품 검색
   const searchProducts = useCallback(async () => {
     if (!activeSellerId) return
     setProductsLoading(true)
@@ -105,12 +80,10 @@ export function ReadyMadeOrder() {
       const params = new URLSearchParams({ seller_id: activeSellerId })
       if (activeBuyerCompanyId) params.set('buyer_company_id', activeBuyerCompanyId)
       if (activeCustomerId) {
-        // 판매회사: 선택한 고객의 company_id로 가격 조회
         const customer = customers.find(c => c.customer_id === activeCustomerId)
         if (customer?.company_id) params.set('buyer_company_id', customer.company_id)
       }
       if (searchKeyword) params.set('search', searchKeyword)
-
       const res = await fetch(`/api/products?${params}`)
       const data = await res.json()
       if (Array.isArray(data)) setProducts(data)
@@ -121,55 +94,27 @@ export function ReadyMadeOrder() {
     }
   }, [activeSellerId, activeBuyerCompanyId, activeCustomerId, searchKeyword, customers])
 
-  // 장바구니에 추가
   const addToCart = (product: ProductWithPrice) => {
     const qtyStr = quantities[product.product_id]
-    if (!qtyStr || parseInt(qtyStr) === 0) {
-      toast.error('수량을 입력하세요.')
-      return
-    }
-
+    if (!qtyStr || parseInt(qtyStr) === 0) { toast.error('수량을 입력하세요.'); return }
     const inputQty = parseInt(qtyStr)
-    const quantity = inputQty * 100 // 내부 ×100 처리
+    const quantity = inputQty * 100
     const absQuantity = Math.abs(quantity)
-
-    // 마대기준에 따라 가격 선택
     const unitPrice = absQuantity < product.madae_criteria
-      ? product.unit_price_level1  // 일반가
-      : product.unit_price_level2  // 마대가 (대량 할인)
-
+      ? product.unit_price_level1 : product.unit_price_level2
     const amount = quantity * unitPrice
 
-    // 판매회사일 때 sellerId / customerId 세팅
-    if (isSeller && !cart.sellerId) {
-      cart.setSeller(user!.companyId)
-    }
-    if (isBuyer && !cart.sellerId) {
-      cart.setSeller(activeSellerId!)
-    }
-
+    if (isSeller && !cart.sellerId) cart.setSeller(user!.companyId)
+    if (isBuyer && !cart.sellerId) cart.setSeller(activeSellerId!)
     cart.setReadyMade('기성')
-
     cart.addItem({
-      productId: product.product_id,
-      categoryId: product.category_id || '',
-      attribute01: product.attribute01 || '',
-      attribute02: product.attribute02 || '',
-      attribute03: product.attribute03 || '',
-      attribute04: product.attribute04 || '',
-      attribute05: product.attribute05 || '',
-      attribute06: '',
-      attribute07: '',
-      attribute08: '',
-      attribute09: '',
-      attribute10: product.categories?.category_s || '',
-      price: unitPrice,
-      quantity,
-      amount,
-      group: '',
+      productId: product.product_id, categoryId: product.category_id || '',
+      attribute01: product.attribute01 || '', attribute02: product.attribute02 || '',
+      attribute03: product.attribute03 || '', attribute04: product.attribute04 || '',
+      attribute05: product.attribute05 || '', attribute06: '', attribute07: '',
+      attribute08: '', attribute09: '', attribute10: product.categories?.category_s || '',
+      price: unitPrice, quantity, amount, group: '',
     })
-
-    // 수량 초기화
     setQuantities(prev => ({ ...prev, [product.product_id]: '' }))
     toast.success(`${product.attribute01} 추가됨`)
   }
@@ -177,139 +122,169 @@ export function ReadyMadeOrder() {
   if (!user) return null
 
   return (
-    <div className="space-y-4">
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base">기성품 주문</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {/* 거래 대상 선택 */}
-          <div className="flex items-end gap-3 flex-wrap">
-            {isSeller && (
-              <div className="space-y-1">
-                <Label className="text-xs">거래처</Label>
-                <Select value={selectedCustomerId} onValueChange={(v) => v && setSelectedCustomerId(v)}>
-                  <SelectTrigger className="w-[200px]">
-                    <SelectValue placeholder="거래처 선택" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {customers.map(c => (
-                      <SelectItem key={c.customer_id} value={c.customer_id}>
-                        {c.customer_name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
+    <div>
+      {/* 상단: 구분 + 거래처 선택 바 (구 앱 silver 배경) */}
+      <div style={{ backgroundColor: 'silver', padding: '5px 8px', marginBottom: '5px', display: 'flex', alignItems: 'center', gap: '15px', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+          <span style={{ fontWeight: 'bold', fontSize: '13px' }}>구분:</span>
+          <select
+            value={isSeller ? '판매' : '구매'}
+            disabled={isBuyer}
+            style={{ padding: '2px', fontSize: '14px' }}
+          >
+            <option value="판매">판매</option>
+            <option value="구매">구매</option>
+          </select>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+          <span style={{ fontWeight: 'bold', fontSize: '13px' }}>거래처:</span>
+          {isSeller ? (
+            <>
+              <input
+                type="text"
+                style={{ padding: '2px', fontSize: '14px', width: '100px', backgroundColor: 'whitesmoke', border: 'none' }}
+                placeholder="거래처 검색"
+              />
+              <select
+                value={selectedCustomerId}
+                onChange={(e) => setSelectedCustomerId(e.target.value)}
+                style={{ padding: '2px', fontSize: '14px' }}
+              >
+                <option value="">선택</option>
+                {customers.map(c => (
+                  <option key={c.customer_id} value={c.customer_id}>
+                    {c.customer_name}({c.owner_name})
+                  </option>
+                ))}
+              </select>
+            </>
+          ) : (
+            <select
+              value={selectedSellerId}
+              onChange={(e) => setSelectedSellerId(e.target.value)}
+              style={{ padding: '2px', fontSize: '14px' }}
+            >
+              {sellers.map(s => (
+                <option key={s.seller_id} value={s.seller_id}>
+                  {s.seller_alias || s.seller_id}
+                </option>
+              ))}
+            </select>
+          )}
+        </div>
+      </div>
 
-            {isBuyer && (
-              <div className="space-y-1">
-                <Label className="text-xs">판매회사</Label>
-                <Select value={selectedSellerId} onValueChange={(v) => v && setSelectedSellerId(v)}>
-                  <SelectTrigger className="w-[200px]">
-                    <SelectValue placeholder="판매회사 선택" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {sellers.map(s => (
-                      <SelectItem key={s.seller_id} value={s.seller_id}>
-                        {s.seller_alias || s.seller_id}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-
-            {/* 검색 */}
-            <div className="space-y-1 flex-1 min-w-[200px]">
-              <Label className="text-xs">상품 검색</Label>
-              <div className="flex gap-2">
-                <Input
+      {/* 좌48% + 우 장바구니 (구 앱 2단 레이아웃) */}
+      <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+        <tbody>
+          <tr>
+            {/* 좌측: 상품 검색 + 후보 목록 */}
+            <td style={{ width: '48%', verticalAlign: 'top', paddingRight: '5px' }}>
+              {/* 검색 입력 - 구 앱 yellow 배경 */}
+              <div style={{ display: 'flex', gap: '3px', marginBottom: '5px' }}>
+                <input
+                  type="text"
                   value={searchKeyword}
                   onChange={(e) => setSearchKeyword(e.target.value)}
-                  placeholder="사이즈, 품명, 색깔"
                   onKeyDown={(e) => e.key === 'Enter' && searchProducts()}
+                  placeholder="사이즈(예, 15*20)를 입력 하시고 엔터키를 누르세요!!"
+                  style={{
+                    flex: 1,
+                    padding: '4px 8px',
+                    fontSize: '14px',
+                    backgroundColor: 'yellow',
+                    border: '1px solid #999',
+                  }}
                 />
-                <Button onClick={searchProducts} disabled={productsLoading}>
-                  {productsLoading ? '...' : '조회'}
-                </Button>
+                <button
+                  onClick={searchProducts}
+                  disabled={productsLoading}
+                  style={{ padding: '4px 12px', fontSize: '13px', cursor: 'pointer' }}
+                >
+                  조회
+                </button>
               </div>
-            </div>
-          </div>
 
-          {/* 상품 목록 */}
-          {products.length > 0 && (
-            <div className="overflow-auto max-h-[400px]">
-              <table className="w-full text-sm">
-                <thead className="sticky top-0">
-                  <tr className="border-b bg-gray-50">
-                    <th className="p-2 text-left">품명</th>
-                    <th className="p-2 text-left">색깔</th>
-                    <th className="p-2 text-left">두께</th>
-                    <th className="p-2 text-left">사이즈</th>
-                    <th className="p-2 text-right">마대기준</th>
-                    <th className="p-2 text-right">일반가</th>
-                    <th className="p-2 text-right">마대가</th>
-                    <th className="p-2 text-center w-[120px]">수량</th>
-                    <th className="p-2 text-center w-[60px]"></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {products.map((p) => (
-                    <tr key={p.product_id} className="border-b hover:bg-gray-50">
-                      <td className="p-2">{p.attribute01}</td>
-                      <td className="p-2">{p.attribute02}</td>
-                      <td className="p-2">{p.attribute03}</td>
-                      <td className="p-2">{p.attribute04}</td>
-                      <td className="p-2 text-right">{p.madae_criteria || '-'}</td>
-                      <td className="p-2 text-right">
-                        <Badge variant="outline" className="text-xs">
-                          {p.unit_price_level1.toLocaleString()}
-                        </Badge>
-                      </td>
-                      <td className="p-2 text-right">
-                        <Badge variant="secondary" className="text-xs">
-                          {p.unit_price_level2.toLocaleString()}
-                        </Badge>
-                      </td>
-                      <td className="p-2">
-                        <Input
-                          type="number"
-                          className="h-8 text-right"
-                          value={quantities[p.product_id] || ''}
-                          onChange={(e) => setQuantities(prev => ({
-                            ...prev,
-                            [p.product_id]: e.target.value,
-                          }))}
-                          onKeyDown={(e) => e.key === 'Enter' && addToCart(p)}
-                          placeholder="0"
-                        />
-                      </td>
-                      <td className="p-2 text-center">
-                        <Button size="sm" className="h-8 text-xs" onClick={() => addToCart(p)}>
-                          담기
-                        </Button>
-                      </td>
+              {/* 상품 후보 GridView */}
+              <div style={{ maxHeight: '612px', overflowY: 'auto', border: '1px solid silver' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
+                  <thead>
+                    <tr style={{ backgroundColor: '#ccffcc' }}>
+                      <th style={thStyle}>Category</th>
+                      <th style={thStyle}>품명</th>
+                      <th style={thStyle}>색깔</th>
+                      <th style={thStyle}>두께</th>
+                      <th style={thStyle}>사이즈</th>
+                      <th style={thStyle}>마대수량</th>
+                      <th style={thStyle}>일반가</th>
+                      <th style={thStyle}>마대가</th>
+                      <th style={{ ...thStyle, width: '70px' }}>수량</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+                  </thead>
+                  <tbody>
+                    {productsLoading ? (
+                      <tr><td colSpan={9} style={{ padding: '20px', textAlign: 'center' }}>조회 중...</td></tr>
+                    ) : products.length === 0 ? (
+                      <tr><td colSpan={9} style={{ padding: '20px', textAlign: 'center' }}>사이즈를 입력 후 조회하세요</td></tr>
+                    ) : products.map((p) => (
+                      <tr key={p.product_id} className="hover:bg-gray-100" style={{ cursor: 'pointer' }}>
+                        <td style={tdStyle}>{p.categories?.category_m || ''}</td>
+                        <td style={tdStyle}>{p.attribute01}</td>
+                        <td style={tdStyle}>{p.attribute02}</td>
+                        <td style={tdStyle}>{p.attribute03}</td>
+                        <td style={tdStyle}>{p.attribute04}</td>
+                        <td style={{ ...tdStyle, textAlign: 'right' }}>{p.madae_criteria?.toLocaleString()}</td>
+                        <td style={{ ...tdStyle, textAlign: 'right' }}>{p.unit_price_level1}</td>
+                        <td style={{ ...tdStyle, textAlign: 'right' }}>{p.unit_price_level2}</td>
+                        <td style={tdStyle}>
+                          <div style={{ display: 'flex', alignItems: 'center' }}>
+                            <input
+                              type="text"
+                              value={quantities[p.product_id] || ''}
+                              onChange={(e) => setQuantities(prev => ({ ...prev, [p.product_id]: e.target.value }))}
+                              onKeyDown={(e) => e.key === 'Enter' && addToCart(p)}
+                              style={{ width: '40px', textAlign: 'right', padding: '1px', fontSize: '12px', backgroundColor: 'whitesmoke', border: 'none' }}
+                            />
+                            <span style={{ fontSize: '11px', color: '#666' }}>00</span>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </td>
 
-      {/* 장바구니 */}
-      {cart.items.length > 0 && (
-        <Cart
-          sellerId={activeSellerId || ''}
-          customerId={isSeller ? selectedCustomerId : undefined}
-          buyerCompanyId={isBuyer ? user.companyId : undefined}
-          orderStatus={orderStatus}
-          onOrderStatusChange={isSeller ? (v) => setOrderStatus(v) : undefined}
-        />
-      )}
+            {/* 우측: 장바구니 */}
+            <td style={{ verticalAlign: 'top', paddingLeft: '5px' }}>
+              <Cart
+                sellerId={activeSellerId || ''}
+                customerId={isSeller ? selectedCustomerId : undefined}
+                buyerCompanyId={isBuyer ? user.companyId : undefined}
+                orderStatus={orderStatus}
+                onOrderStatusChange={isSeller ? (v) => setOrderStatus(v) : undefined}
+              />
+            </td>
+          </tr>
+        </tbody>
+      </table>
+
+      {/* 안내문 - 구 앱 orange 배경 */}
+      <div style={{ backgroundColor: 'orange', padding: '10px', marginTop: '10px', fontSize: '13px' }}>
+        <strong>기성품 주문 방법 안내</strong><br />
+        <span style={{ color: 'blue' }}>* 기성품 상품 추가는 키보드의 숫자키와 엔터키만으로도 처리가 가능합니다 *</span><br />
+        1. 노란색 칸에 size를(예, 15*20) 입력 하고 엔터<br />
+        2. 탭키로 상품 선택 후 수량을 100장 단위로 입력하고 엔터<br />
+        3. 엔터를 치면 자동으로 장바구니에 추가됩니다
+      </div>
     </div>
   )
+}
+
+const thStyle: React.CSSProperties = {
+  padding: '3px 5px', border: '1px solid silver', textAlign: 'left',
+  whiteSpace: 'nowrap', fontWeight: 'bold', fontSize: '12px',
+}
+const tdStyle: React.CSSProperties = {
+  padding: '3px 5px', border: '1px solid silver', whiteSpace: 'nowrap', fontSize: '12px',
 }

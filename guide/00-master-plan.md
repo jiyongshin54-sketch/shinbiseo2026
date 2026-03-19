@@ -1,258 +1,177 @@
 # 신비서(ShinBiSeo) .NET WebForms → Next.js + Supabase 전환 마스터 플랜
 
 ## 프로젝트 개요
-- **프로젝트명:** 신비서 2026 (shinbiseo2026)
-- **원본:** ASP.NET WebForms (D:\신지용\AWS Renewal\2026\AppRoot\new.shinbiseo.com\)
-- **DB 백업:** D:\신지용\AWS Renewal\2026\DB20251129\
-- **개발 폴더:** D:\신지용\shinbiseo2026\
-- **기술 스택:** Next.js 15 (App Router) + Supabase + Tailwind CSS + shadcn/ui
-- **배포:** Vercel + Supabase Cloud
-- **인증:** Supabase Auth (Google OAuth Provider)
-
-## 개발 단계 요약
-
-| Step | 작업 | 가이드 파일 | 상태 |
-|------|------|------------|------|
-| 0 | 프로젝트 초기 설정 | `01-project-setup.md` | ⬜ |
-| 1 | DB 스키마 (PostgreSQL) + RLS | `02-database-schema.md` | ⬜ |
-| 2 | 인증 시스템 | `03-authentication.md` | ⬜ |
-| 3 | 타입 정의 + 권한 훅 + 레이아웃 | `04-types-and-layout.md` | ⬜ |
-| 4 | 전광판 + 주문 조회 | `05-main-orders.md` | ⬜ |
-| 5 | 기성품 주문 (장바구니 + 가격 산정) | `06-cart-and-new-order.md` | ⬜ |
-| 5-1 | 맞춤품 주문 (가격 산정 공식) | `06-1-custom-order.md` | ⬜ |
-| 6 | 고객관리 (판매+구매 공통) | `07-customer-management.md` | ⬜ |
-| 7 | 회사 설정 (MyCompany) | `08-my-company.md` | ⬜ |
-| 8 | 풍원 전용 모듈 | `09-pungwon-module.md` | ⬜ |
-| 9 | 리그라운드 전용 모듈 | `10-reground-module.md` | ⬜ |
-| 10 | 청구서/거래명세표/전자세금계산서 | `11-billing-trading-stubs.md` | ⬜ |
-| 11 | 데이터 마이그레이션 | `12-data-migration.md` | ⬜ |
-| 12 | Vercel 배포 + 도메인 설정 | `13-deployment.md` | ⬜ |
+- **현행**: ASP.NET WebForms (new.shinbiseo.com)
+- **목표**: Next.js 15 (App Router) + Supabase + Tailwind CSS + shadcn/ui
+- **배포**: Vercel + Supabase Cloud
+- **인증**: Supabase Auth (Google Provider)
+- **원칙**: 클론코딩 우선 → 이후 보완/범용화
 
 ---
 
-## 핵심 비즈니스 모델
+## 핵심 비즈니스 구조
 
-### 방산시장 B2B 도매 거래 구조
-```
-[판매회사(도매상)] ←──── 물건 구매 ────→ [구매회사(소매/중간상)]
-      풍원(00002)                         다수의 구매회사
-      리그라운드(00046)                    (이 사람들도 최종 소비자에게 판매)
-```
-- **판매회사**: 포장자재 도매상. 기성품/맞춤품을 판매
-- **구매회사**: 판매회사로부터 물건을 사서 다시 파는 중간 유통상. 자신만의 거래처가 있음
-- 양쪽 모두 주문을 생성할 수 있고, 양쪽 모두 고객(거래처)을 관리할 수 있음
+### 회사 유형 (Companies.power)
+- **판매회사**: 도매상 (풍원비닐포장, 오픈패키지/리그라운드 등)
+- **구매회사**: 소매상/재판매상 (판매회사에서 물건을 사서 팔려는 회사)
 
-### Companies vs Customers 관계
-- **Companies**: 신비서에 가입한 모든 회사 (Power: '구매' 또는 '판매')
-- **Customers**: 특정 회사 입장에서의 고객 목록 (SellerID 기준 스코핑)
-  - 판매회사의 Customers = 자사에서 물건을 사가는 구매회사들
-  - 구매회사도 자체 Customers를 관리할 수 있음 (자기 거래처)
-- Customers.CompanyID가 있으면 → 신비서 가입 회사
-- Customers.CompanyID가 없으면 → 신비서 미가입 고객 (수동 등록)
-- **Contracts**: 판매-구매 간 거래 관계 매핑 (SellerID + BuyerID → CustomerID)
+### 사용자 권한 (Users.power)
+- **대표**: 모든 기능 + 직원관리(승인/삭제)
+- **관리자**: 대부분 기능 (직원관리 제외)
+- **직원**: 기본 기능 (자기 주문만 조회, 금액 일부 마스킹)
+
+### Customers vs Companies 관계
+- Companies: 신비서에 가입한 회사 (CompanyID 보유)
+- Customers: 판매회사 입장의 고객회사 목록 (SellerID+CustomerID 기준)
+- 고객회사가 신비서 가입 시 Customers.CompanyID ↔ Companies.CompanyID 매핑
+- 미가입 고객은 Customers에만 존재 (CompanyID = '')
+
+### 주문 워크플로우
+```
+[구매회사]                [판매회사]
+주문/견적요청 ──────→  주문 접수
+                        품목별 준비 (준비됨/재고없음)
+              ←──────  전체 준비됨
+수령 확인 ──────────→
+                결제 완료
+```
+
+### 가격 체계
+- **기성품**: Customers.Level1(일반등급)/Level2(마대등급) → Products.UnitPrice01~20 매핑
+- **맞춤품**: 공식 = (두께×폭×(길이+5)×0.184×등급상수) + 인쇄비
 
 ---
 
-## 권한 체계
+## 페이지/화면 구조 (구 앱 기준 - 스크린샷 확인됨)
 
-### 회사 권한 (companies.power)
-| 기능 | 판매회사 | 구매회사 |
-|------|---------|---------|
-| 주문 생성 | O (장부 등록, 견적 등록) | O (기성품/맞춤품 주문) |
-| 전광판 조회 | O (30초 자동 리프레시+알람) | O (수동 리프레시) |
-| 상품 준비 (개별 품목) | O | X |
-| 수령 확인 | O (대리 수령) | O |
-| 결제/완료 처리 | O | X |
-| 고객관리 | O | O (자체 거래처) |
-| 제품관리 | O | X |
-| 거래명세표 발행 | O | X |
-| 거래명세표 조회 | O | O |
+### Main.aspx (단일 페이지, PlaceHolder 전환)
 
-### 사용자 권한 (users.power) — 판매/구매 공통 적용
-Users.Power(대표/관리자/직원)는 판매회사와 구매회사 모두에게 적용되며, 아래와 같은 차이가 있음.
+**헤더**: 좌=로고+타이틀("신BS - 포장자재 온라인 도매시장"), 우=회사명(권한)
+**메뉴 8개 탭** (whitesmoke 배경, cornflowerblue 테두리, darkslateblue 텍스트):
+```
+Main 화면 | 거래처 관리 | 거래명세표 관리 | 세금계산서 관리 | 주문 관리 | 기성품 주문 | 맞춤품 주문 | 우리 회사 관리
+```
 
-**판매+구매 공통 체크 (6곳):**
-| 기능 | 대표 | 관리자 | 직원 |
-|------|------|--------|------|
-| 거래처(고객) 목록 조회 | O | O | X ("거래처는 대표와 관리자만 볼 수 있습니다") |
-| 주문 전체 검색 (거래처 무관) | O | X (거래처 선택 필수) | X (거래처 선택 필수) |
-| 회사 정보 수정 버튼 | O | X | X |
-| 직원 목록 조회 | O | X | X |
-| 직원 삭제 버튼 | O | X | X |
+PlaceHolder별 화면:
+1. **main화면PH** - 좌32%(판매회사 바로가기) + 우68%(전광판), 하단(공지사항+광고)
+2. **거래처관리PH** - 좌40%(고객목록) + 우60%(상세/등록), 미수금관리PH
+3. **거래명세표PH** - 검색 + 좌50%(목록) + 우(등록/수정)
+4. **세금계산서안내PH + 세금계산서PH** - 안내/조회
+5. **주문관리PH** - 2행 필터 + 판매/구매 GridView + 일괄처리
+6. **SellerOrder기성PH** - 좌48%(상품검색) + 우(장바구니+주문)
+7. **SellerOrder맞춤PH** - 좌25%(입력폼) + 우75%(장바구니+견적/주문)
+8. **우리회사PH** - 회사정보 + 직원관리
 
-**판매회사 전용 체크 (2곳):**
-| 기능 | 대표 | 관리자/직원 |
-|------|------|-----------|
-| 주문 목록 금액 표시 | O (숫자) | X ("*****" 마스킹) |
-| 타인 주문 액션 버튼 | O | X (자기 주문만) |
+### 별도 페이지
+- **Pungwon.aspx** - 풍원 딜러네트워크 (기성주문/맞춤주문/단가표/고객가입)
+- **Reground.aspx** - 오픈패키지 딜러네트워크 (동일 구조)
+- **MyCompany.aspx** - 내 회사 관리 (상품/재고/거래처/직원) 별도 메뉴 5개
+- **Billing.aspx** - 청구서 (팝업 창)
+- **eTaxBill.aspx** - 거래명세표 인쇄 (팝업 창)
 
 ---
 
-## 주문 상태 흐름 (State Machine)
+## Next.js 라우트 매핑
 
-### 기성품 흐름 (견적 과정 없음)
-```
-주문 → [개별 품목 준비] → 준비됨 → 수령 → 완료
-              ↓
-       일부 준비됨 (일부만 준비)
-       전부 준비됨 (전부 준비 완료)
-       입고 대기중 (재고 없는 품목 → 별도 주문 자동 분리)
-```
-
-### 맞춤품 흐름 (견적 과정 포함)
-```
-견적 요청 → 견적 응답 → 주문 → [개별 품목 준비] → 준비됨 → 수령 → 완료
-```
-> ※ 견적 요청/견적 응답은 **맞춤품(ReadyMade='맞춤')에만 해당**
-> 기성품은 바로 "주문" 상태로 시작됨
-
-### 상태 전이 규칙 (SetOrderMStatus)
-| 새 상태 | 허용되는 이전 상태 |
-|---------|-------------------|
-| 준비됨 | 주문, 입고 대기중 |
-| 수령 | 준비됨, 일부 준비됨, 전부 준비됨 |
-| 완료 | 수령 |
-| 견적 취소 | 견적 요청, 견적 응답 *(맞춤품만)* |
-| 주문 취소 | 주문, 입고 대기중 |
-| 준비됨 취소 | 준비됨, 전부 준비됨, 일부 준비됨 |
-| 수령 취소 | 수령 |
-| 완료 취소 | 완료 |
-
-### 개별 품목 준비 프로세스 (핵심)
-```
-주문 접수 (모든 품목 Status='')
-  ↓ 판매회사가 품목 하나씩 "준비" 클릭
-OrdersD 개별 행 Status → '준비됨' 또는 '재고없음'
-  ↓ 시스템 자동 판단
-  ├─ 아직 미처리 품목 있음 → OrdersM Status = '일부 준비됨'
-  ├─ 모든 품목 처리 완료 → OrdersM Status = '전부 준비됨' / '준비됨'
-  └─ '재고없음' 품목 있으면 → 별도 주문(입고 대기중)으로 자동 분리
-```
-
-### 완료 처리 단축 (판매회사)
-판매회사는 "완료 처리" 버튼으로 한번에 처리 가능:
-```
-모든 품목 준비됨 → 대리 수령 → 결제 완료 (현금/수금/이체/카드)
-```
+| 구 앱 화면 | Next.js Route | 구현상태 |
+|-----------|---------------|---------|
+| main화면PH | /main | ⚠️ 구조 수정 필요 |
+| 거래처관리PH | /customers | ⚠️ 별도 페이지 분리 필요 |
+| 거래명세표PH | /trading-stubs | 🔴 신규 |
+| 세금계산서PH | /e-tax-bill | 🔴 신규 |
+| 주문관리PH | /orders | 🔴 신규 |
+| SellerOrder기성PH | /ready-made-order | ⚠️ 별도 페이지 분리 필요 |
+| SellerOrder맞춤PH | /custom-order | ⚠️ 별도 페이지 분리 필요 |
+| 우리회사PH | /my-company | ⚠️ 보강 필요 |
+| Pungwon.aspx | /pungwon | 🔴 미구현 |
+| Reground.aspx | /reground | 🔴 미구현 |
+| MyCompany.aspx | /my-company-admin | 🔴 신규 (판매회사 전용) |
+| Billing.aspx | /billing | ⚠️ 보강 |
+| eTaxBill.aspx | /trading-stub-print | ⚠️ 보강 |
 
 ---
 
-## 전광판 (Display Board)
+## 전광판 상세 (스크린샷 기준)
 
-메인 화면의 핵심 영역. 주문 현황을 실시간으로 보여주는 대시보드.
+### 레이아웃
+```
+┌──────────────────────────────────────────────────────────────┐
+│ [로고] 신BS - 포장자재 온라인 도매시장     풍원비닐포장(관리자) │
+├────┬────┬────┬────┬────┬────┬────┬────┤
+│Main│거래처│거래명세│세금계산│주문관리│기성품│맞춤품│우리회사│
+│화면│ 관리│표 관리│서 관리│      │ 주문│ 주문│ 관리│
+├────┴────┴────┴────┴────┴────┴────┴────┤
+│ 주요 판매회사 │  내 주문 전광판                              │
+│  바로가기    │  [자동Refresh중지] [전체▼] [모든 상태▼]      │
+│             │ ┌──────────────────────────┐│
+│  풍원비닐    │ │주문일자│상태│판매사│구매사│대표물건│...    ││
+│  [이미지]    │ │───────────────────────────││
+│             │ │2026.03.31│주문│풍원│탄탄포장│지퍼백...│    ││
+│  오픈패키지   │ │2026.03.30│주문│풍원│봉투나라│지퍼백...│    ││
+│  [이미지]    │ │  ...     │    │    │      │        │    ││
+│             │ └──────────────────────────┘│
+├─────────────┼───────────────────────────────┤
+│ 신비서 공지사항│ 광고 배너                                    │
+└─────────────┴───────────────────────────────┘
+```
 
-### 색상 코딩
-| 색상 | 의미 |
+### 전광판 컬럼 (실제 사이트 확인)
+주문일자 | 상태 | 판매사 | 구매사 | 대표물건 | 주문자 | 구분 | 건수 | 공급가 | 처리일시 | [보기] | [명세표]
+
+### 전광판 행 색상
+| 상태 | 기성 | 맞춤 |
+|------|------|------|
+| 견적 | YellowGreen | YellowGreen |
+| 주문 | Yellow | LightSkyBlue |
+| 준비됨 | DarkOrange | DeepPink |
+| 수령 | Silver | Silver |
+| 완료 | White | White |
+| 취소 | DarkGray | DarkGray |
+
+---
+
+## 디자인 시스템 (구 앱 기준 클론)
+
+### 색상
+| 용도 | 색상 |
 |------|------|
-| 🟡 YellowGreen | 견적 관련 (견적 요청/응답) |
-| 🟨 Yellow | 주문 + 기성품 |
-| 🔵 LightSkyBlue | 주문 + 맞춤품 |
-| ⚪ Silver | 재고 없음 + 기성품 |
-| 🟠 DarkOrange | 준비됨 + 기성품 |
-| 🔴 DeepPink | 준비됨 + 맞춤품 |
+| 메인 헤더 | cornflowerblue (#6495ED) |
+| 메뉴 탭 배경 | whitesmoke |
+| 메뉴 텍스트 | darkslateblue |
+| GV 헤더 | #ccffcc |
+| 장바구니 | skyblue |
+| 입력 폼 | palegoldenrod |
+| 합계 영역 | aliceblue |
+| 버튼 | #5BA4FC |
+| 딜러네트워크 헤더 | palevioletred |
+| 명세표 테두리 | darkorange |
+| 내회사 헤더 | cadetblue |
 
-### 자동 리프레시 (판매회사만)
-- 30초 간격 자동 새로고침
-- 새 주문 감지 시 알람 사운드(Alarm.wav) 재생
-- 중단 버튼으로 자동 리프레시 끄기 가능
-
----
-
-## 가격 산정 체계
-
-### 기성품 가격 (Level → UnitPrice 매핑)
-Customers 테이블의 Level1(일반가), Level2(마대가) → Products 테이블의 UnitPrice01~13
-
-| 등급 | Products 컬럼 |
-|------|--------------|
-| 3.8급 | UnitPrice01 |
-| 3.9급 | UnitPrice02 |
-| 4.0급 | UnitPrice03 |
-| 4.1급 | UnitPrice04 |
-| 4.2급 | UnitPrice05 |
-| 4.3급 | UnitPrice06 |
-| 4.4급 | UnitPrice07 |
-| 4.5급 | UnitPrice08 |
-| 4.6급 | UnitPrice09 |
-| 4.7급 | UnitPrice10 |
-| 4.8급 | UnitPrice11 |
-| 4.9급 | UnitPrice12 |
-| 5.0급 | UnitPrice13 |
-
-**가격 선택 로직:**
-```
-if (주문수량 < 마대기준수량)  → Level1(일반가) 등급의 UnitPrice 적용
-if (주문수량 >= 마대기준수량) → Level2(마대가) 등급의 UnitPrice 적용
-```
-- 마대기준수량 = Products.Attribute05 값
-- 수량은 내부적으로 ×100 처리됨
-
-### 맞춤품 가격 공식
-```
-단가 = Round(ValueA + ValueB, 1)
-
-ValueA (재료비) = 두께 × 폭 × (길이 + 5.0) × 0.184 × 등급상수
-ValueB (인쇄비) = 도수값 == 0 ? 0 : max((도수값 × 8000 × 폭) / 45700, 2.0)
-
-등급상수 = Level 값에서 "급" 제거한 숫자 (예: "3.8급" → 3.8)
-```
-
-**도수(인쇄 색상 수) 매핑:**
-| 선택값 | 도수값 |
-|-------|--------|
-| 무지/없음 | 0 |
-| 1도 | 1 |
-| 2도 | 2 |
-| 3도 | 3 |
-| 양면 1도 | 2 |
-| 양면 2도 | 4 |
-| 양면 3도 | 6 |
+### 폰트/레이아웃
+- Nanum Gothic, 14px
+- 최대 너비 1500px, margin:auto
+- GridView: border 1px solid silver, padding 3px
 
 ---
 
-## CartTable 컬럼 구조 (세션 장바구니)
+## 개발 우선순위 (현재 상태 기준)
 
-| 컬럼 | 기성품 | 맞춤품 |
-|------|--------|--------|
-| Sequence | 순번 | 순번 |
-| ProductID | 상품ID | (없음) |
-| CategoryID | 카테고리 | 카테고리 |
-| Attribute01 | 품명 | 품명 |
-| Attribute02 | 색깔 | 색깔 |
-| Attribute03 | 두께 | 두께 |
-| Attribute04 | 사이즈 | 폭×길이 |
-| Attribute05 | 마대수량 | **인쇄명** |
-| Attribute06 | - | **도수** |
-| Attribute07 | - | **가공방식** |
-| Attribute08 | - | **도안명** |
-| Attribute10 | CategoryS | CategoryS |
-| Price | 단가 | 단가 |
-| Quantity | 수량(×100) | 수량 |
-| Amount | 금액 | 금액 |
-| Group | 묶음 | 묶음 |
+### 즉시 수정 (구조 변경)
+1. 네비게이션: 8개 메뉴탭 + 구 앱 스타일
+2. 메인 페이지: 전광판만 (좌우 2분할 레이아웃)
+3. 기성품/맞춤품/거래처: 메인에서 분리 → 독립 페이지
 
----
+### 신규 구현 필요
+1. 주문 관리 (검색/필터/일괄처리)
+2. 거래명세표 관리 (등록/수정/출력)
+3. 세금계산서 관리
+4. 풍원/오픈패키지 딜러네트워크
+5. MyCompany (상품/재고/거래처/직원)
 
-## ID 체계
-- **CompanyID:** varchar(5), zero-padded ('00001'~)
-- **CustomerID:** varchar(5), 회사별 독립 채번
-- **UserID:** char(21), Google OAuth numeric ID → Supabase auth_uid(UUID) 추가
-- **OrderID:** varchar(18), `DateTime.Now.Ticks.ToString()` (타임스탬프 기반)
-- **TsID:** varchar(18), 동일 방식
-- **ProductID:** varchar(5), 판매회사별 독립 채번
-
-## 핵심 참조 파일 (기존 코드)
-
-| 파일 | 용도 | 클론 대상 |
-|------|------|----------|
-| `App_Code/ShinbsDB.cs` | DB 접근 레이어 전체 | API Routes |
-| `App_Code/Shinbs.cs` | 비즈니스 로직 (XML 주문 등) | API Routes |
-| `Main.aspx` + `Main.aspx.cs` | 전광판+주문+고객관리+거래명세 | /main |
-| `Default.aspx.cs` | 인증 후 세션/CartTable 초기화 | /auth/callback |
-| `FirstLogin.aspx.cs` | 온보딩 로직 | /first-login |
-| `MyCompany.aspx.cs` | 회사 설정 | /my-company |
-| `Pungwon.aspx.cs` | 풍원 모듈 (기성 주문은 Main으로 이관됨) | /pungwon |
-| `Reground.aspx.cs` | 리그라운드 모듈 | /reground |
-| `Billing.aspx.cs` | 청구서 + 미수금 | /billing |
-| `TradingStubPrint.aspx.cs` | 거래명세표 인쇄 | /trading-stub-print |
-| `eTaxBill.aspx.cs` | 전자세금계산서 | /e-tax-bill |
+### 보강 필요
+1. 전광판 상태 필터 (7개 옵션)
+2. 주문 상세: 품목별 준비/재고없음
+3. 주문 수정 기능
+4. 도안 파일 업로드/보기
+5. 미수금 관리
+6. 금액 마스킹 (직원용)

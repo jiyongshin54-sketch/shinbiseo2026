@@ -2,15 +2,6 @@
 
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { useAuth } from '@/hooks/use-auth'
-import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
 import { OrderDetailPanel } from './order-detail-panel'
 import { AUTO_REFRESH_INTERVAL } from '@/lib/constants'
 import type { DisplayBoardOrder } from '@/lib/types'
@@ -22,6 +13,7 @@ export function DisplayBoard() {
   const [loading, setLoading] = useState(true)
   const [selectedOrder, setSelectedOrder] = useState<DisplayBoardOrder | null>(null)
   const [readyMadeFilter, setReadyMadeFilter] = useState('전체')
+  const [statusFilter, setStatusFilter] = useState('모든 상태')
   const [autoRefresh, setAutoRefresh] = useState(canAutoRefresh)
   const prevCountRef = useRef(0)
 
@@ -37,13 +29,25 @@ export function DisplayBoard() {
     if (readyMadeFilter !== '전체') {
       params.set('ready_made', readyMadeFilter)
     }
+    if (statusFilter !== '모든 상태') {
+      const statusMap: Record<string, string> = {
+        '견적 상태': '견적',
+        '주문 상태': '주문',
+        '준비됨 상태': '준비됨',
+        '수령 상태': '수령',
+        '완료 상태': '완료',
+        '취소 상태': '취소',
+      }
+      if (statusMap[statusFilter]) {
+        params.set('status', statusMap[statusFilter])
+      }
+    }
 
     try {
       const res = await fetch(`/api/orders?${params}`)
       const data = await res.json()
 
       if (Array.isArray(data)) {
-        // 새 주문 감지 (판매회사)
         if (isSeller && prevCountRef.current > 0 && data.length > prevCountRef.current) {
           toast.info('새 주문이 들어왔습니다!')
           try { new Audio('/alarm.wav').play() } catch {}
@@ -56,9 +60,8 @@ export function DisplayBoard() {
     } finally {
       setLoading(false)
     }
-  }, [user, isSeller, readyMadeFilter])
+  }, [user, isSeller, readyMadeFilter, statusFilter])
 
-  // 초기 로드 + 자동 리프레시
   useEffect(() => {
     fetchOrders()
   }, [fetchOrders])
@@ -69,17 +72,18 @@ export function DisplayBoard() {
     return () => clearInterval(interval)
   }, [autoRefresh, canAutoRefresh, fetchOrders])
 
-  const getRowColor = (status: string | null, readyMade: string | null): string => {
-    if (!status) return ''
-    if (status.includes('견적')) return 'bg-lime-200'
-    if (status === '주문' && readyMade === '기성') return 'bg-yellow-200'
-    if (status === '주문' && readyMade === '맞춤') return 'bg-sky-200'
-    if (status === '입고 대기중') return 'bg-gray-200'
-    if (status.includes('준비됨') && readyMade === '기성') return 'bg-orange-300'
-    if (status.includes('준비됨') && readyMade === '맞춤') return 'bg-pink-400 text-white'
-    if (status === '수령') return 'bg-blue-100'
-    if (status === '완료') return 'bg-gray-100'
-    return ''
+  // 구 앱 색상 코딩 (YellowGreen, Yellow, LightSkyBlue, DarkOrange, DeepPink, Silver, DarkGray)
+  const getRowStyle = (status: string | null, readyMade: string | null): React.CSSProperties => {
+    if (!status) return {}
+    if (status.includes('견적')) return { backgroundColor: 'YellowGreen' }
+    if (status === '주문' && readyMade === '기성') return { backgroundColor: 'Yellow' }
+    if (status === '주문' && readyMade === '맞춤') return { backgroundColor: 'LightSkyBlue' }
+    if (status.includes('준비됨') && readyMade === '기성') return { backgroundColor: 'DarkOrange', color: 'white' }
+    if (status.includes('준비됨') && readyMade === '맞춤') return { backgroundColor: 'DeepPink', color: 'white' }
+    if (status === '수령') return { backgroundColor: 'Silver' }
+    if (status === '완료') return { backgroundColor: 'White' }
+    if (status === '취소') return { backgroundColor: 'DarkGray', color: 'white' }
+    return {}
   }
 
   const formatAmount = (amount: number | null): string => {
@@ -91,108 +95,125 @@ export function DisplayBoard() {
   if (!user) return null
 
   return (
-    <div className="space-y-4">
-      {/* 필터 바 */}
-      <div className="flex items-center gap-3 flex-wrap">
-        <Select value={readyMadeFilter} onValueChange={(v) => v && setReadyMadeFilter(v)}>
-          <SelectTrigger className="w-[120px]">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="전체">전체</SelectItem>
-            <SelectItem value="기성">기성</SelectItem>
-            <SelectItem value="맞춤">맞춤</SelectItem>
-          </SelectContent>
-        </Select>
-
-        <Button variant="outline" size="sm" onClick={fetchOrders}>
-          새로고침
-        </Button>
-
+    <div>
+      {/* 필터 바 - 구 앱 스타일 */}
+      <div className="flex items-center justify-end gap-2 mb-1 flex-wrap">
         {canAutoRefresh && (
-          <Button
-            variant={autoRefresh ? 'default' : 'outline'}
-            size="sm"
+          <button
             onClick={() => setAutoRefresh(!autoRefresh)}
+            style={{
+              padding: '4px 8px',
+              fontSize: '12px',
+              backgroundColor: autoRefresh ? '#f0f0f0' : '#ddd',
+              border: '1px solid silver',
+              borderRadius: '3px',
+              cursor: 'pointer',
+            }}
           >
-            {autoRefresh ? '⏸ 자동새로고침 끄기' : '▶ 자동새로고침 켜기'}
-          </Button>
+            {autoRefresh ? '자동Refresh 중지' : '자동Refresh 시작'}
+          </button>
         )}
-
-        <span className="text-sm text-muted-foreground ml-auto">
-          총 {orders.length}건
-          {autoRefresh && isSeller && (
-            <span className="ml-2 text-green-600 animate-pulse">● 실시간</span>
-          )}
-        </span>
+        <select
+          value={readyMadeFilter}
+          onChange={(e) => setReadyMadeFilter(e.target.value)}
+          style={{ padding: '2px', fontSize: '14px' }}
+        >
+          <option value="전체">전체</option>
+          <option value="기성">기성</option>
+          <option value="맞춤">맞춤</option>
+        </select>
+        <select
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value)}
+          style={{ padding: '2px', fontSize: '14px' }}
+        >
+          <option value="모든 상태">모든 상태</option>
+          <option value="견적 상태">견적 상태</option>
+          <option value="주문 상태">주문 상태</option>
+          <option value="준비됨 상태">준비됨 상태</option>
+          <option value="수령 상태">수령 상태</option>
+          <option value="완료 상태">완료 상태</option>
+          <option value="취소 상태">취소 상태</option>
+        </select>
       </div>
 
-      {/* 주문 목록 테이블 */}
-      <div className="rounded-lg border bg-white overflow-auto">
-        <table className="w-full text-sm">
+      {/* 전광판 테이블 - 구 앱 GridView 스타일 */}
+      <div style={{ maxHeight: '410px', overflowY: 'auto', border: '1px solid silver' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
           <thead>
-            <tr className="border-b bg-gray-50">
-              <th className="p-2 text-left whitespace-nowrap">거래일자</th>
-              <th className="p-2 text-left whitespace-nowrap">
-                {isSeller ? '거래처' : '판매회사'}
-              </th>
-              <th className="p-2 text-center whitespace-nowrap">구분</th>
-              <th className="p-2 text-right whitespace-nowrap">품목</th>
-              <th className="p-2 text-right whitespace-nowrap">금액</th>
-              <th className="p-2 text-right whitespace-nowrap">부가세</th>
-              <th className="p-2 text-right whitespace-nowrap">합계</th>
-              <th className="p-2 text-center whitespace-nowrap">상태</th>
-              {isSeller && <th className="p-2 text-center whitespace-nowrap">결제</th>}
-              <th className="p-2 text-left whitespace-nowrap">비고</th>
+            <tr style={{ backgroundColor: '#ccffcc' }}>
+              <th style={thStyle}>주문 일자</th>
+              <th style={thStyle}>상태</th>
+              <th style={thStyle}>판매사</th>
+              <th style={thStyle}>구매사</th>
+              <th style={thStyle}>대표물건</th>
+              <th style={thStyle}>주문자</th>
+              <th style={thStyle}>구분</th>
+              <th style={thStyle}>건수</th>
+              <th style={thStyle}>공급가</th>
+              <th style={thStyle}>처리 일시</th>
+              <th style={thStyle}>보기</th>
+              {isSeller && <th style={thStyle}>명세표</th>}
             </tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr>
-                <td colSpan={10} className="p-8 text-center text-muted-foreground">
-                  로딩 중...
-                </td>
-              </tr>
+              <tr><td colSpan={12} style={{ padding: '20px', textAlign: 'center' }}>로딩 중...</td></tr>
             ) : orders.length === 0 ? (
-              <tr>
-                <td colSpan={10} className="p-8 text-center text-muted-foreground">
-                  주문이 없습니다.
-                </td>
-              </tr>
+              <tr><td colSpan={12} style={{ padding: '20px', textAlign: 'center' }}>주문이 없습니다.</td></tr>
             ) : (
               orders.map((order) => (
                 <tr
                   key={`${order.order_id}-${order.seller_id}`}
-                  className={`border-b cursor-pointer hover:opacity-80 transition-opacity ${getRowColor(order.status, order.ready_made)} ${
-                    selectedOrder?.order_id === order.order_id ? 'ring-2 ring-blue-500' : ''
-                  }`}
+                  style={{
+                    ...getRowStyle(order.status, order.ready_made),
+                    cursor: 'pointer',
+                    ...(selectedOrder?.order_id === order.order_id
+                      ? { outline: '2px solid blue' }
+                      : {}),
+                  }}
+                  className="hover:opacity-80"
                   onClick={() => setSelectedOrder(order)}
                 >
-                  <td className="p-2 whitespace-nowrap">{order.order_date}</td>
-                  <td className="p-2 whitespace-nowrap">
-                    {isSeller
-                      ? order.customer_name || order.customer_id
-                      : order.seller_name || order.seller_id
-                    }
+                  <td style={tdStyle}>{order.order_date}</td>
+                  <td style={{ ...tdStyle, textAlign: 'center' }}>{order.status}</td>
+                  <td style={tdStyle}>{order.seller_name || order.seller_id}</td>
+                  <td style={tdStyle}>{order.customer_name || order.customer_id}</td>
+                  <td style={tdStyle}>
+                    {order.representative_item || ''}
                   </td>
-                  <td className="p-2 text-center">
-                    <Badge variant="outline" className="text-xs">
-                      {order.ready_made}
-                    </Badge>
+                  <td style={tdStyle}>{order.orderer_name || ''}</td>
+                  <td style={{ ...tdStyle, textAlign: 'center' }}>{order.ready_made}</td>
+                  <td style={{ ...tdStyle, textAlign: 'right' }}>{order.item_count}</td>
+                  <td style={{ ...tdStyle, textAlign: 'right' }}>{formatAmount(order.sum_amount)}</td>
+                  <td style={{ ...tdStyle, fontSize: '11px' }}>
+                    {order.finish_time || order.receive_time || order.ready_time || order.order_time || ''}
                   </td>
-                  <td className="p-2 text-right">{order.item_count}</td>
-                  <td className="p-2 text-right">{formatAmount(order.sum_amount)}</td>
-                  <td className="p-2 text-right">{formatAmount(order.vat)}</td>
-                  <td className="p-2 text-right font-medium">{formatAmount(order.total_amount)}</td>
-                  <td className="p-2 text-center">
-                    <Badge className="text-xs">{order.status}</Badge>
+                  <td style={{ ...tdStyle, textAlign: 'center' }}>
+                    <span
+                      style={{ color: 'cornflowerblue', cursor: 'pointer', textDecoration: 'underline' }}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setSelectedOrder(order)
+                      }}
+                    >
+                      보기
+                    </span>
                   </td>
                   {isSeller && (
-                    <td className="p-2 text-center text-xs">{order.payment_method}</td>
+                    <td style={{ ...tdStyle, textAlign: 'center' }}>
+                      <span
+                        style={{ color: 'cornflowerblue', cursor: 'pointer', textDecoration: 'underline' }}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          // TODO: 거래명세표 팝업
+                          window.open(`/trading-stub-print?orderId=${order.order_id}`, '_blank', 'width=800,height=600')
+                        }}
+                      >
+                        명세표
+                      </span>
+                    </td>
                   )}
-                  <td className="p-2 text-xs text-muted-foreground truncate max-w-[120px]">
-                    {order.comment}
-                  </td>
                 </tr>
               ))
             )}
@@ -202,12 +223,31 @@ export function DisplayBoard() {
 
       {/* 주문 상세 패널 */}
       {selectedOrder && (
-        <OrderDetailPanel
-          order={selectedOrder}
-          onClose={() => setSelectedOrder(null)}
-          onStatusChanged={fetchOrders}
-        />
+        <div style={{ marginTop: '8px' }}>
+          <OrderDetailPanel
+            order={selectedOrder}
+            onClose={() => setSelectedOrder(null)}
+            onStatusChanged={fetchOrders}
+          />
+        </div>
       )}
     </div>
   )
+}
+
+// 구 앱 GridView 스타일 (th/td: padding:3px, border:1px solid silver)
+const thStyle: React.CSSProperties = {
+  padding: '3px 5px',
+  border: '1px solid silver',
+  textAlign: 'left',
+  whiteSpace: 'nowrap',
+  fontWeight: 'bold',
+  fontSize: '12px',
+}
+
+const tdStyle: React.CSSProperties = {
+  padding: '3px 5px',
+  border: '1px solid silver',
+  whiteSpace: 'nowrap',
+  fontSize: '12px',
 }
