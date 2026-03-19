@@ -2,8 +2,8 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useAuth } from '@/hooks/use-auth'
-import { Badge } from '@/components/ui/badge'
 import { OrderDetailPanel } from '@/components/orders/order-detail-panel'
+import { toast } from 'sonner'
 const ORDER_STATUS_LIST = ['주문', '준비됨', '수령', '완료', '취소', '견적']
 import type { OrderMaster } from '@/lib/types'
 
@@ -15,6 +15,7 @@ export default function OrdersPage() {
   const [orders, setOrders] = useState<OrderMaster[]>([])
   const [loading, setLoading] = useState(false)
   const [selectedOrder, setSelectedOrder] = useState<OrderMaster | null>(null)
+  const [editingOrder, setEditingOrder] = useState<OrderMaster | null>(null)
 
   const [viewMode, setViewMode] = useState('판매 내역')
   const [dateFrom, setDateFrom] = useState(() => {
@@ -26,13 +27,15 @@ export default function OrdersPage() {
   const [readyMadeFilter, setReadyMadeFilter] = useState('')
   const [customerFilter, setCustomerFilter] = useState('')
   const [paymentMethodFilter, setPaymentMethodFilter] = useState('')
+  const [paymentTypeFilter, setPaymentTypeFilter] = useState('')
 
   const fetchOrders = useCallback(async () => {
     if (!user) return
     setLoading(true)
     try {
       const params = new URLSearchParams()
-      if (isSeller) {
+      // viewMode에 따라 판매/구매 전환
+      if (viewMode === '판매 내역' && isSeller) {
         params.set('seller_id', user.companyId)
       } else {
         params.set('buyer_id', user.companyId)
@@ -41,14 +44,22 @@ export default function OrdersPage() {
       params.set('dateTo', dateTo.replace(/-/g, '.'))
       if (statusFilter) params.set('status', statusFilter)
       if (readyMadeFilter) params.set('ready_made', readyMadeFilter)
+      if (paymentMethodFilter) params.set('payment_method', paymentMethodFilter)
 
       const res = await fetch(`/api/orders?${params}`)
       const data = await res.json()
       let filtered = Array.isArray(data) ? data : (data.orders || [])
+      // 클라이언트사이드 필터: 거래처명
       if (customerFilter) {
         filtered = filtered.filter((o: any) =>
           o.customer_id?.includes(customerFilter) ||
           o.customer_name?.includes(customerFilter)
+        )
+      }
+      // 클라이언트사이드 필터: 거래처 결제방식
+      if (paymentTypeFilter) {
+        filtered = filtered.filter((o: any) =>
+          o.customer_payment === paymentTypeFilter
         )
       }
       setOrders(filtered)
@@ -57,7 +68,7 @@ export default function OrdersPage() {
     } finally {
       setLoading(false)
     }
-  }, [user, isSeller, dateFrom, dateTo, statusFilter, readyMadeFilter, customerFilter])
+  }, [user, isSeller, viewMode, dateFrom, dateTo, statusFilter, readyMadeFilter, customerFilter, paymentMethodFilter, paymentTypeFilter])
 
   useEffect(() => { fetchOrders() }, [fetchOrders])
 
@@ -76,6 +87,49 @@ export default function OrdersPage() {
     }
     setDateFrom(from.toISOString().split('T')[0])
     setDateTo(to.toISOString().split('T')[0])
+  }
+
+  // --- 주문 수정 (인라인) ---
+  const [editComment, setEditComment] = useState('')
+  const [editPaymentMethod, setEditPaymentMethod] = useState('')
+  const [editPaymentDate, setEditPaymentDate] = useState('')
+  const [editOrderDate, setEditOrderDate] = useState('')
+  const [editSaving, setEditSaving] = useState(false)
+
+  const startEdit = (order: OrderMaster, e: React.MouseEvent) => {
+    e.stopPropagation()
+    setEditingOrder(order)
+    setEditComment(order.comment || '')
+    setEditPaymentMethod(order.payment_method || '')
+    setEditPaymentDate(order.payment_date || '')
+    setEditOrderDate(order.order_date || '')
+  }
+
+  const saveEdit = async () => {
+    if (!editingOrder) return
+    setEditSaving(true)
+    try {
+      const res = await fetch(`/api/orders/${editingOrder.order_id}/status`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          seller_id: editingOrder.seller_id,
+          comment: editComment,
+          payment_method: editPaymentMethod,
+          payment_date: editPaymentDate,
+          order_date: editOrderDate,
+        }),
+      })
+      if (res.ok) {
+        toast.success('수정 완료')
+        setEditingOrder(null)
+        fetchOrders()
+      } else {
+        const err = await res.json()
+        toast.error(err.error || '수정 실패')
+      }
+    } catch { toast.error('수정 실패') }
+    finally { setEditSaving(false) }
   }
 
   const getRowStyle = (status: string): React.CSSProperties => {
@@ -100,8 +154,6 @@ export default function OrdersPage() {
             <option>판매 내역</option>
             <option>구매 내역</option>
           </select>
-          <span style={{ fontSize: '13px' }}>보는항목:</span>
-          <select style={ddlStyle}><option>주문별</option><option>세부항목별</option></select>
           <span style={{ fontSize: '13px' }}>기준일자:</span>
           <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} style={{ ...ddlStyle, width: '130px' }} />
           <span>~</span>
@@ -131,12 +183,45 @@ export default function OrdersPage() {
             {ORDER_STATUS_LIST.map(s => <option key={s} value={s}>{s}</option>)}
           </select>
           <span style={{ fontSize: '13px' }}>거래처 결제방식:</span>
-          <select style={ddlStyle}>
+          <select value={paymentTypeFilter} onChange={(e) => setPaymentTypeFilter(e.target.value)} style={ddlStyle}>
             <option value="">전체</option>
             <option value="일결제">일결제</option><option value="월결제">월결제</option>
           </select>
         </div>
       </div>
+
+      {/* 주문 수정 패널 (인라인) */}
+      {editingOrder && (
+        <div style={{ backgroundColor: '#ffffcc', border: '2px solid orange', padding: '10px', marginBottom: '5px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '15px', flexWrap: 'wrap' }}>
+            <strong style={{ fontSize: '13px' }}>주문 수정: {editingOrder.order_id}</strong>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+              <span style={{ fontSize: '12px' }}>거래일자:</span>
+              <input type="text" value={editOrderDate} onChange={e => setEditOrderDate(e.target.value)} style={{ ...ddlStyle, width: '90px' }} />
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+              <span style={{ fontSize: '12px' }}>결제수단:</span>
+              <select value={editPaymentMethod} onChange={e => setEditPaymentMethod(e.target.value)} style={ddlStyle}>
+                <option value="">미정</option>
+                <option value="현금">현금</option><option value="수금">수금</option>
+                <option value="카드">카드</option><option value="이체">이체</option>
+              </select>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+              <span style={{ fontSize: '12px' }}>결제일:</span>
+              <input type="text" value={editPaymentDate} onChange={e => setEditPaymentDate(e.target.value)} style={{ ...ddlStyle, width: '90px' }} />
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+              <span style={{ fontSize: '12px' }}>비고:</span>
+              <input type="text" value={editComment} onChange={e => setEditComment(e.target.value)} style={{ ...ddlStyle, width: '150px' }} />
+            </div>
+            <button onClick={saveEdit} disabled={editSaving} style={{ padding: '3px 15px', fontWeight: 'bold', fontSize: '13px', cursor: 'pointer', backgroundColor: 'cornflowerblue', color: 'white', border: 'none' }}>
+              {editSaving ? '저장중...' : '저장'}
+            </button>
+            <button onClick={() => setEditingOrder(null)} style={{ padding: '3px 15px', fontSize: '13px', cursor: 'pointer' }}>취소</button>
+          </div>
+        </div>
+      )}
 
       {/* 주문 목록 GridView */}
       <div style={{ maxHeight: '600px', overflowY: 'auto', border: '1px solid silver' }}>
@@ -169,13 +254,17 @@ export default function OrdersPage() {
             ) : orders.map((order) => (
               <tr
                 key={order.order_id}
-                style={{ ...getRowStyle(order.status || ''), cursor: 'pointer' }}
+                style={{
+                  ...getRowStyle(order.status || ''),
+                  cursor: 'pointer',
+                  outline: editingOrder?.order_id === order.order_id ? '2px solid orange' : 'none',
+                }}
                 className="hover:opacity-80"
                 onClick={() => setSelectedOrder(order)}
               >
                 <td style={tdStyle}>{order.order_date}</td>
                 <td style={{ ...tdStyle, textAlign: 'center' }}>{order.status}</td>
-                <td style={tdStyle}>{order.customer_id}</td>
+                <td style={tdStyle}>{(order as any).customer_name || order.customer_id}</td>
                 <td style={tdStyle}>{(order as any).orderer_name || ''}</td>
                 <td style={{ ...tdStyle, textAlign: 'center' }}>{order.ready_made}</td>
                 <td style={tdStyle}>{(order as any).representative_item || ''}</td>
@@ -190,7 +279,10 @@ export default function OrdersPage() {
                 <td style={{ ...tdStyle, maxWidth: '100px' }}>{order.comment || ''}</td>
                 {isSeller && (
                   <td style={{ ...tdStyle, textAlign: 'center' }}>
-                    <span style={{ color: 'cornflowerblue', cursor: 'pointer', textDecoration: 'underline' }}>수정</span>
+                    <span
+                      onClick={(e) => startEdit(order, e)}
+                      style={{ color: 'cornflowerblue', cursor: 'pointer', textDecoration: 'underline' }}
+                    >수정</span>
                   </td>
                 )}
               </tr>
@@ -200,7 +292,7 @@ export default function OrdersPage() {
       </div>
 
       {/* 주문 상세 */}
-      {selectedOrder && (
+      {selectedOrder && !editingOrder && (
         <div style={{ marginTop: '8px' }}>
           <OrderDetailPanel
             order={selectedOrder as any}
