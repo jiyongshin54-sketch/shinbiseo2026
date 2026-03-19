@@ -128,7 +128,7 @@ export function ReadyMadeOrder() {
         <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
           <span style={{ fontWeight: 'bold', fontSize: '13px' }}>구분:</span>
           <select
-            value={isSeller ? '판매' : '구매'}
+            defaultValue={isSeller ? '판매' : '구매'}
             disabled={isBuyer}
             style={{ padding: '2px', fontSize: '14px' }}
           >

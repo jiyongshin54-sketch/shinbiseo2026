@@ -10,28 +10,25 @@ export async function GET(request: NextRequest) {
   const params = request.nextUrl.searchParams
   const sellerId = params.get('seller_id')
   const buyerId = params.get('buyer_id')
-  const dateFrom = params.get('date_from')
-  const dateTo = params.get('date_to')
+  const dateFrom = params.get('dateFrom') || params.get('date_from')
+  const dateTo = params.get('dateTo') || params.get('date_to')
   const status = params.get('status')
   const readyMade = params.get('ready_made')
   const mode = params.get('mode') // 'display_board' | 'search'
 
   try {
     if (sellerId) {
-      // 판매회사 조회: seller_id 기준 직접 조회
+      // 판매회사 조회: seller_id 기준
       let query = supabase
         .from('orders_m')
-        .select(`
-          *,
-          customers!inner ( customer_name )
-        `)
+        .select('*')
         .eq('seller_id', sellerId)
 
       if (dateFrom) query = query.gte('order_date', dateFrom)
       if (dateTo) query = query.lte('order_date', dateTo)
       if (readyMade && readyMade !== '전체') query = query.eq('ready_made', readyMade)
 
-      // 전광판 모드: 활성 주문 + 오늘 건
+      // 전광판 모드: 활성 주문 + 최근 건
       if (mode === 'display_board') {
         const today = new Date()
         const lookback = new Date(today)
@@ -41,11 +38,10 @@ export async function GET(request: NextRequest) {
 
         query = query
           .gte('order_date', lookbackStr)
-          .or(`status.eq.주문,status.eq.입고 대기중,status.like.%준비됨,order_date.eq.${todayStr}`)
+          .or(`status.eq.주문,status.eq.입고 대기중,status.like.%준비됨%,status.like.%견적%,order_date.eq.${todayStr}`)
       } else if (status && status !== '전체') {
-        // 검색 모드: 특정 상태 필터
         if (status === '준비됨') {
-          query = query.like('status', '%준비됨')
+          query = query.like('status', '%준비됨%')
         } else {
           query = query.eq('status', status)
         }
@@ -56,7 +52,29 @@ export async function GET(request: NextRequest) {
       const { data, error } = await query
       if (error) throw error
 
-      return NextResponse.json(data || [])
+      // 고객명 매핑 (별도 조회)
+      const orders = data || []
+      if (orders.length > 0) {
+        const customerIds = [...new Set(orders.map(o => o.customer_id).filter(Boolean))]
+        const { data: customers } = await supabase
+          .from('customers')
+          .select('customer_id, customer_name')
+          .eq('seller_id', sellerId)
+          .in('customer_id', customerIds)
+
+        const customerMap = new Map(
+          (customers || []).map(c => [c.customer_id, c.customer_name])
+        )
+
+        const enriched = orders.map(order => ({
+          ...order,
+          customer_name: customerMap.get(order.customer_id) || order.customer_id,
+        }))
+
+        return NextResponse.json(enriched)
+      }
+
+      return NextResponse.json(orders)
 
     } else if (buyerId) {
       // 구매회사 조회: contracts → orders_m
@@ -69,7 +87,6 @@ export async function GET(request: NextRequest) {
         return NextResponse.json([])
       }
 
-      // 각 계약별 주문 조회
       const allOrders = []
       for (const contract of contracts) {
         let query = supabase
@@ -90,10 +107,10 @@ export async function GET(request: NextRequest) {
 
           query = query
             .gte('order_date', lookbackStr)
-            .or('status.eq.견적 요청,status.eq.견적 응답,status.eq.주문,status.eq.입고 대기중,status.like.%준비됨')
+            .or('status.eq.견적 요청,status.eq.견적 응답,status.eq.주문,status.eq.입고 대기중,status.like.%준비됨%')
         } else if (status && status !== '전체') {
           if (status === '준비됨') {
-            query = query.like('status', '%준비됨')
+            query = query.like('status', '%준비됨%')
           } else {
             query = query.eq('status', status)
           }
@@ -110,7 +127,7 @@ export async function GET(request: NextRequest) {
         }
       }
 
-      // StatusKey로 정렬
+      // 상태별 정렬
       allOrders.sort((a, b) => {
         const ka = getStatusKey(a.status)
         const kb = getStatusKey(b.status)
@@ -149,7 +166,6 @@ export async function POST(request: NextRequest) {
     const epochOffset = BigInt('621355968000000000')
     const orderId = (BigInt(Date.now()) * ticksPerMs + epochOffset).toString()
 
-    // orders_m INSERT
     const { error: masterError } = await supabase.from('orders_m').insert({
       seller_id,
       order_id: orderId,
@@ -171,7 +187,6 @@ export async function POST(request: NextRequest) {
 
     if (masterError) throw masterError
 
-    // orders_d INSERT
     if (items && items.length > 0) {
       const detailRows = items.map((item: Record<string, unknown>, idx: number) => ({
         seller_id,
@@ -208,7 +223,6 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// 헬퍼: StatusKey (정렬용)
 function getStatusKey(status: string | null): number {
   if (!status) return 99
   if (status.includes('견적')) return 0
@@ -220,7 +234,6 @@ function getStatusKey(status: string | null): number {
   return 6
 }
 
-// 헬퍼: 날짜 포맷
 function formatDate(d: Date): string {
   const y = d.getFullYear()
   const m = String(d.getMonth() + 1).padStart(2, '0')
