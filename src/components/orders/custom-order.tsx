@@ -26,7 +26,12 @@ interface SellerOption {
   customer_id: string
 }
 
-export function CustomOrder() {
+interface CustomOrderProps {
+  fixedSellerId?: string
+  fixedCustomerId?: string
+}
+
+export function CustomOrder({ fixedSellerId, fixedCustomerId }: CustomOrderProps = {}) {
   const { user, isSeller, isBuyer } = useAuth()
   const cart = useCartStore()
 
@@ -80,7 +85,7 @@ export function CustomOrder() {
   const getGradeConstant = (): number => {
     if (isSeller) {
       // 판매회사: 선택한 고객의 Level2 사용
-      const customer = customers.find(c => c.customer_id === selectedCustomerId)
+      const customer = customers.find(c => c.customer_id === activeCustomerId)
       return gradeToNumber(customer?.level2 || '4.0급')
     } else {
       // 구매회사: 본인의 Level1 사용 (API에서 가져와야 하지만, 기본값 사용)
@@ -133,10 +138,10 @@ export function CustomOrder() {
     }
 
     const amount = price * qty
-    const activeSellerId = isSeller ? user!.companyId : selectedSellerId
+    const sellerForCart = fixedSellerId || (isSeller ? user!.companyId : selectedSellerId)
 
     if (!cart.sellerId) {
-      cart.setSeller(activeSellerId)
+      cart.setSeller(sellerForCart)
     }
     cart.setReadyMade('맞춤')
 
@@ -173,7 +178,8 @@ export function CustomOrder() {
 
   if (!user) return null
 
-  const activeSellerId = isSeller ? user.companyId : selectedSellerId
+  const activeSellerId = fixedSellerId || (isSeller ? user.companyId : selectedSellerId)
+  const activeCustomerId = fixedCustomerId || selectedCustomerId
 
   return (
     <div className="space-y-4">
@@ -182,8 +188,8 @@ export function CustomOrder() {
           <CardTitle className="text-base">맞춤품 주문</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          {/* 거래 대상 선택 */}
-          <div className="flex items-end gap-3 flex-wrap">
+          {/* 거래 대상 선택 (풍원/리그라운드 전용 페이지에서는 숨김) */}
+          {!fixedSellerId && <div className="flex items-end gap-3 flex-wrap">
             {isSeller && (
               <div className="space-y-1">
                 <Label className="text-xs">거래처</Label>
@@ -219,7 +225,7 @@ export function CustomOrder() {
                 </Select>
               </div>
             )}
-          </div>
+          </div>}
 
           {/* 맞춤품 입력 폼 */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -308,7 +314,7 @@ export function CustomOrder() {
       {cart.items.length > 0 && cart.readyMade === '맞춤' && (
         <Cart
           sellerId={activeSellerId || ''}
-          customerId={isSeller ? selectedCustomerId : undefined}
+          customerId={isSeller ? activeCustomerId : undefined}
           buyerCompanyId={isBuyer ? user.companyId : undefined}
           orderStatus={orderStatus}
           onOrderStatusChange={isSeller ? (v) => setOrderStatus(v) : undefined}

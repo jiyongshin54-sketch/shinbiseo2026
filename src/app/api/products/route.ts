@@ -15,6 +15,18 @@ export async function GET(request: NextRequest) {
   const buyerCompanyId = params.get('buyer_company_id')
   const search = params.get('search')
   const categoryId = params.get('category_id')
+  const categoryM = params.get('category_m')
+  const getCategories = params.get('get_categories')
+
+  // 카테고리 목록만 반환
+  if (getCategories === 'true') {
+    const { data, error } = await supabase
+      .from('categories')
+      .select('category_id, category_m, category_s')
+      .order('category_id')
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    return NextResponse.json(data)
+  }
 
   if (!sellerId) {
     return NextResponse.json({ error: 'seller_id required' }, { status: 400 })
@@ -48,6 +60,17 @@ export async function GET(request: NextRequest) {
 
     if (categoryId) {
       query = query.eq('category_id', categoryId)
+    }
+
+    if (categoryM) {
+      // 카테고리 중분류로 필터 (리그라운드용)
+      const { data: catIds } = await supabase
+        .from('categories')
+        .select('category_id')
+        .eq('category_m', categoryM)
+      if (catIds && catIds.length > 0) {
+        query = query.in('category_id', catIds.map(c => c.category_id))
+      }
     }
 
     if (search) {

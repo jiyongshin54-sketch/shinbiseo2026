@@ -20,6 +20,7 @@ interface CartStore {
   removeItem: (sequence: number) => void
   updateItem: (sequence: number, updates: Partial<CartItem>) => void
   setSeller: (id: string) => void
+  setCustomerId: (id: string) => void
   setCustomer: (id: string, name: string) => void
   setReadyMade: (value: '기성' | '맞춤') => void
   setOrderDate: (date: string) => void
@@ -87,6 +88,7 @@ export const useCartStore = create<CartStore>()(
       },
 
       setSeller: (id) => set({ sellerId: id }),
+      setCustomerId: (id) => set({ customerId: id }),
       setCustomer: (id, name) => set({ customerId: id, customerName: name }),
       setReadyMade: (value) => set({ readyMade: value }),
       setOrderDate: (date) => set({ orderDate: date }),
