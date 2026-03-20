@@ -16,7 +16,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Cart } from './cart'
 import { calculateCustomPrice, gradeToNumber } from '@/lib/pricing'
-import { COLOR_COUNT_OPTIONS, SELLER_COMPANIES } from '@/lib/constants'
+import { COLOR_COUNT_OPTIONS, SELLER_COMPANIES, PRICE_GRADES } from '@/lib/constants'
 import type { Customer } from '@/lib/types'
 import { toast } from 'sonner'
 
@@ -54,6 +54,9 @@ export function CustomOrder({ fixedSellerId, fixedCustomerId }: CustomOrderProps
   const [unitPrice, setUnitPrice] = useState('')
   const [quantity, setQuantity] = useState('')
 
+  // 구매회사: 판매회사 고객으로 등록된 내 Level2
+  const [buyerLevel2, setBuyerLevel2] = useState<string>('')
+
   // 주문 상태 (판매회사용)
   const [orderStatus, setOrderStatus] = useState('견적 요청')
 
@@ -81,16 +84,34 @@ export function CustomOrder({ fixedSellerId, fixedCustomerId }: CustomOrderProps
       .catch(() => {})
   }, [user, isBuyer])
 
-  // 등급상수 결정
-  const getGradeConstant = (): number => {
+  // 구매회사: 선택한 판매회사의 customers에서 내 Level2 조회
+  useEffect(() => {
+    if (!user || !isBuyer || !selectedSellerId) return
+    fetch(`/api/customers?seller_id=${selectedSellerId}&search=${encodeURIComponent(user.companyId)}&by_company_id=true`)
+      .then(res => res.json())
+      .then(data => {
+        if (Array.isArray(data) && data.length > 0) {
+          setBuyerLevel2(data[0].level2 || '')
+        } else {
+          setBuyerLevel2('')
+        }
+      })
+      .catch(() => setBuyerLevel2(''))
+  }, [user, isBuyer, selectedSellerId])
+
+  const validGrades = PRICE_GRADES as readonly string[]
+
+  // 등급상수 결정 (유효하지 않으면 null 반환)
+  const getGradeConstant = (): number | null => {
+    let level2: string | undefined | null
     if (isSeller) {
-      // 판매회사: 선택한 고객의 Level2 사용
       const customer = customers.find(c => c.customer_id === activeCustomerId)
-      return gradeToNumber(customer?.level2 || '4.0급')
+      level2 = customer?.level2
     } else {
-      // 구매회사: 본인의 Level1 사용 (API에서 가져와야 하지만, 기본값 사용)
-      return 4.0
+      level2 = buyerLevel2
     }
+    if (!level2 || !validGrades.includes(level2)) return null
+    return gradeToNumber(level2)
   }
 
   // 단가 자동 계산
@@ -104,8 +125,13 @@ export function CustomOrder({ fixedSellerId, fixedCustomerId }: CustomOrderProps
       return
     }
 
-    const colorCount = COLOR_COUNT_OPTIONS[parseInt(colorCountIdx)]?.value || 0
     const gradeConstant = getGradeConstant()
+    if (gradeConstant === null) {
+      toast.error('고객 단가 산정 중 오류!! 풍원에 문의하세요!!')
+      return
+    }
+
+    const colorCount = COLOR_COUNT_OPTIONS[parseInt(colorCountIdx)]?.value || 0
 
     const price = calculateCustomPrice({
       thickness: t,

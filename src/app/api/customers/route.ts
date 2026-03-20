@@ -14,6 +14,7 @@ export async function GET(request: NextRequest) {
   const sellerId = params.get('seller_id')
   const search = params.get('search')
   const status = params.get('status')
+  const byCompanyId = params.get('by_company_id')
 
   if (!sellerId) {
     return NextResponse.json({ error: 'seller_id required' }, { status: 400 })
@@ -25,7 +26,10 @@ export async function GET(request: NextRequest) {
       .select('*')
       .eq('seller_id', sellerId)
 
-    if (search) {
+    if (byCompanyId === 'true' && search) {
+      // company_id로 정확히 조회 (구매회사가 자기 고객 정보 조회용)
+      query = query.eq('company_id', search)
+    } else if (search) {
       query = query.or(
         `customer_name.ilike.%${search}%,business_id.ilike.%${search}%`
       )
@@ -57,6 +61,11 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
     const { seller_id, ...customerData } = body
+
+    // level1, level2 필수값 검증
+    if (!customerData.level1 || !customerData.level2) {
+      return NextResponse.json({ error: '일반가 등급(level1)과 마대가 등급(level2)은 필수입니다.' }, { status: 400 })
+    }
 
     // customer_id 자동 채번 (seller_id 기준 MAX+1)
     const { data: maxCustomer } = await supabase

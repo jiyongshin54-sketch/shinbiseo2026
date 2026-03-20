@@ -20,7 +20,7 @@ export async function GET(
   try {
     const { data, error } = await supabase
       .from('orders_d')
-      .select('*, categories ( category_l, category_m, category_s )')
+      .select('*')
       .eq('seller_id', sellerId)
       .eq('order_id', orderId)
       .order('sequence', { ascending: true })

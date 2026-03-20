@@ -63,19 +63,24 @@ export default function BillingPage() {
                 <th className="p-2 text-left">거래처명</th>
                 <th className="p-2 text-center">결제조건</th>
                 <th className="p-2 text-right">미수금</th>
+                <th className="p-2 text-center">청구서</th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan={3} className="p-4 text-center">로딩 중...</td></tr>
+                <tr><td colSpan={4} className="p-4 text-center">로딩 중...</td></tr>
               ) : receivables.length === 0 ? (
-                <tr><td colSpan={3} className="p-4 text-center text-muted-foreground">미수금이 없습니다.</td></tr>
+                <tr><td colSpan={4} className="p-4 text-center text-muted-foreground">미수금이 없습니다.</td></tr>
               ) : (
                 receivables.map((r) => (
                   <tr key={r.customer_id} className="border-b hover:bg-gray-50">
                     <td className="p-2 font-medium">{r.customer_name}</td>
                     <td className="p-2 text-center"><Badge variant="outline" className="text-xs">{r.payment || '-'}</Badge></td>
                     <td className="p-2 text-right font-medium">{r.total.toLocaleString()}원</td>
+                    <td className="p-2 text-center space-x-1">
+                      <a href={`/billing/${r.customer_id}?period=이번달`} target="_blank" className="text-blue-600 underline text-xs">이번달</a>
+                      <a href={`/billing/${r.customer_id}?period=지난달`} target="_blank" className="text-blue-600 underline text-xs">지난달</a>
+                    </td>
                   </tr>
                 ))
               )}
@@ -86,6 +91,7 @@ export default function BillingPage() {
                   <td className="p-2">합계</td>
                   <td></td>
                   <td className="p-2 text-right">{totalReceivable.toLocaleString()}원</td>
+                  <td></td>
                 </tr>
               </tfoot>
             )}

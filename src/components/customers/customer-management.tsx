@@ -72,6 +72,10 @@ export function CustomerManagement() {
       toast.error('고객명은 필수입니다.')
       return
     }
+    if (!formData.level1 || !formData.level2) {
+      toast.error('일반가 등급과 마대가 등급은 필수입니다.')
+      return
+    }
     setSaving(true)
     try {
       if (editingCustomer) {
@@ -261,7 +265,7 @@ export function CustomerManagement() {
             </div>
             <div className="grid grid-cols-3 gap-3">
               <div className="space-y-1">
-                <Label className="text-xs">일반가 등급</Label>
+                <Label className="text-xs">일반가 등급 *</Label>
                 <Select value={formData.level1 || '4.0급'} onValueChange={(v) => v && updateForm('level1', v)}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
@@ -270,7 +274,7 @@ export function CustomerManagement() {
                 </Select>
               </div>
               <div className="space-y-1">
-                <Label className="text-xs">마대가 등급</Label>
+                <Label className="text-xs">마대가 등급 *</Label>
                 <Select value={formData.level2 || '4.0급'} onValueChange={(v) => v && updateForm('level2', v)}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>

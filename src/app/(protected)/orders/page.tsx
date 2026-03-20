@@ -4,13 +4,13 @@ import { useState, useEffect, useCallback } from 'react'
 import { useAuth } from '@/hooks/use-auth'
 import { OrderDetailPanel } from '@/components/orders/order-detail-panel'
 import { toast } from 'sonner'
-const ORDER_STATUS_LIST = ['주문', '준비됨', '수령', '완료', '취소', '견적']
+const ORDER_STATUS_LIST = ['전체', '집계', '결산', '주문', '준비됨', '수령', '완료', '취소', '견적']
 import type { OrderMaster } from '@/lib/types'
 
 const READY_MADE_OPTIONS = ['기성', '맞춤']
 
 export default function OrdersPage() {
-  const { user, isSeller } = useAuth()
+  const { user, isSeller, isOwner } = useAuth()
 
   const [orders, setOrders] = useState<OrderMaster[]>([])
   const [loading, setLoading] = useState(false)
@@ -31,6 +31,11 @@ export default function OrdersPage() {
 
   const fetchOrders = useCallback(async () => {
     if (!user) return
+    // 비대표는 거래처 선택 필수 (결산 상태 제외)
+    if (!isOwner && statusFilter !== '결산' && !customerFilter) {
+      toast.error('조회할 거래처를 선택하세요. 거래처별 조회만 가능합니다.')
+      return
+    }
     setLoading(true)
     try {
       const params = new URLSearchParams()
@@ -68,7 +73,7 @@ export default function OrdersPage() {
     } finally {
       setLoading(false)
     }
-  }, [user, isSeller, viewMode, dateFrom, dateTo, statusFilter, readyMadeFilter, customerFilter, paymentMethodFilter, paymentTypeFilter])
+  }, [user, isSeller, isOwner, viewMode, dateFrom, dateTo, statusFilter, readyMadeFilter, customerFilter, paymentMethodFilter, paymentTypeFilter])
 
   useEffect(() => { fetchOrders() }, [fetchOrders])
 

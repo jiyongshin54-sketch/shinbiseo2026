@@ -2,7 +2,8 @@
 
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { useAuth } from '@/hooks/use-auth'
-import { OrderDetailPanel } from './order-detail-panel'
+import { OrderDetailModal } from './order-detail-modal'
+import { TradingStubModal } from './trading-stub-modal'
 import { AUTO_REFRESH_INTERVAL } from '@/lib/constants'
 import type { DisplayBoardOrder } from '@/lib/types'
 import { toast } from 'sonner'
@@ -12,6 +13,9 @@ export function DisplayBoard() {
   const [orders, setOrders] = useState<DisplayBoardOrder[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedOrder, setSelectedOrder] = useState<DisplayBoardOrder | null>(null)
+  const [modalOpen, setModalOpen] = useState(false)
+  const [stubOrder, setStubOrder] = useState<DisplayBoardOrder | null>(null)
+  const [stubModalOpen, setStubModalOpen] = useState(false)
   const [readyMadeFilter, setReadyMadeFilter] = useState('전체')
   const [statusFilter, setStatusFilter] = useState('모든 상태')
   const [autoRefresh, setAutoRefresh] = useState(canAutoRefresh)
@@ -90,6 +94,22 @@ export function DisplayBoard() {
     if (amount == null) return ''
     if (!canViewAmountInList) return '*****'
     return Number(amount).toLocaleString()
+  }
+
+  // ISO datetime → "MM.DD HH:MM" 짧은 형식
+  const formatTime = (timeStr: string | null | undefined): string => {
+    if (!timeStr) return ''
+    try {
+      const d = new Date(timeStr)
+      if (isNaN(d.getTime())) return ''
+      const mm = String(d.getMonth() + 1).padStart(2, '0')
+      const dd = String(d.getDate()).padStart(2, '0')
+      const hh = String(d.getHours()).padStart(2, '0')
+      const mi = String(d.getMinutes()).padStart(2, '0')
+      return `${mm}.${dd} ${hh}:${mi}`
+    } catch {
+      return ''
+    }
   }
 
   if (!user) return null
@@ -173,7 +193,7 @@ export function DisplayBoard() {
                       : {}),
                   }}
                   className="hover:opacity-80"
-                  onClick={() => setSelectedOrder(order)}
+                  onClick={() => { setSelectedOrder(order); setModalOpen(true) }}
                 >
                   <td style={tdStyle}>{order.order_date}</td>
                   <td style={{ ...tdStyle, textAlign: 'center' }}>{order.status}</td>
@@ -187,7 +207,7 @@ export function DisplayBoard() {
                   <td style={{ ...tdStyle, textAlign: 'right' }}>{order.item_count}</td>
                   <td style={{ ...tdStyle, textAlign: 'right' }}>{formatAmount(order.sum_amount)}</td>
                   <td style={{ ...tdStyle, fontSize: '11px' }}>
-                    {order.finish_time || order.receive_time || order.ready_time || order.order_time || ''}
+                    {formatTime(order.finish_time || order.receive_time || order.ready_time || order.order_time)}
                   </td>
                   <td style={{ ...tdStyle, textAlign: 'center' }}>
                     <span
@@ -195,6 +215,7 @@ export function DisplayBoard() {
                       onClick={(e) => {
                         e.stopPropagation()
                         setSelectedOrder(order)
+                        setModalOpen(true)
                       }}
                     >
                       보기
@@ -206,8 +227,8 @@ export function DisplayBoard() {
                         style={{ color: 'cornflowerblue', cursor: 'pointer', textDecoration: 'underline' }}
                         onClick={(e) => {
                           e.stopPropagation()
-                          // TODO: 거래명세표 팝업
-                          window.open(`/trading-stub-print?orderId=${order.order_id}`, '_blank', 'width=800,height=600')
+                          setStubOrder(order)
+                          setStubModalOpen(true)
                         }}
                       >
                         명세표
@@ -221,16 +242,20 @@ export function DisplayBoard() {
         </table>
       </div>
 
-      {/* 주문 상세 패널 */}
-      {selectedOrder && (
-        <div style={{ marginTop: '8px' }}>
-          <OrderDetailPanel
-            order={selectedOrder}
-            onClose={() => setSelectedOrder(null)}
-            onStatusChanged={fetchOrders}
-          />
-        </div>
-      )}
+      {/* 주문 상세 모달 */}
+      <OrderDetailModal
+        order={selectedOrder}
+        open={modalOpen}
+        onClose={() => { setModalOpen(false); setSelectedOrder(null) }}
+        onStatusChanged={fetchOrders}
+      />
+
+      {/* 거래명세표 모달 */}
+      <TradingStubModal
+        order={stubOrder}
+        open={stubModalOpen}
+        onClose={() => { setStubModalOpen(false); setStubOrder(null) }}
+      />
     </div>
   )
 }

@@ -25,7 +25,7 @@ interface CartProps {
 }
 
 export function Cart({ sellerId, customerId, buyerCompanyId, orderStatus, onOrderStatusChange }: CartProps) {
-  const { user, isSeller } = useAuth()
+  const { user, isSeller, isBuyer } = useAuth()
   const cart = useCartStore()
   const [submitting, setSubmitting] = useState(false)
 
@@ -175,6 +175,8 @@ export function Cart({ sellerId, customerId, buyerCompanyId, orderStatus, onOrde
                 className="h-8 w-[130px]"
                 value={cart.orderDate}
                 onChange={(e) => cart.setOrderDate(e.target.value)}
+                readOnly={isBuyer}
+                style={isBuyer ? { backgroundColor: '#f0f0f0' } : undefined}
               />
             </div>
 
@@ -182,7 +184,7 @@ export function Cart({ sellerId, customerId, buyerCompanyId, orderStatus, onOrde
             <div className="space-y-1">
               <Label className="text-xs">합계 조정</Label>
               <div className="flex gap-1">
-                <Select value={cart.adjustmentSign} onValueChange={(v) => v && cart.setAdjustmentSign(v as '+' | '-')}>
+                <Select value={cart.adjustmentSign} onValueChange={(v) => v && !isBuyer && cart.setAdjustmentSign(v as '+' | '-')} disabled={isBuyer}>
                   <SelectTrigger className="w-[60px] h-8">
                     <SelectValue />
                   </SelectTrigger>
@@ -196,6 +198,8 @@ export function Cart({ sellerId, customerId, buyerCompanyId, orderStatus, onOrde
                   className="h-8 w-[100px]"
                   value={cart.adjustment || ''}
                   onChange={(e) => cart.setAdjustment(parseInt(e.target.value) || 0)}
+                  readOnly={isBuyer}
+                  style={isBuyer ? { backgroundColor: '#f0f0f0' } : undefined}
                 />
               </div>
             </div>

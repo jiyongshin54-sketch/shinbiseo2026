@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { useAuth } from '@/hooks/use-auth'
 import { useCartStore } from '@/stores/cart-store'
 import { Cart } from './cart'
-import { SELLER_COMPANIES } from '@/lib/constants'
+import { SELLER_COMPANIES, PRICE_GRADES } from '@/lib/constants'
 import type { Customer } from '@/lib/types'
 import { toast } from 'sonner'
 
@@ -94,7 +94,17 @@ export function ReadyMadeOrder() {
     }
   }, [activeSellerId, activeBuyerCompanyId, activeCustomerId, searchKeyword, customers])
 
+  const validGrades = PRICE_GRADES as readonly string[]
+
   const addToCart = (product: ProductWithPrice) => {
+    // 등급 유효성 검증 (Level이 null이거나 범위 밖이면 차단)
+    const level1 = product.customer_level1
+    const level2 = product.customer_level2
+    if (!level1 || !level2 || !validGrades.includes(level1) || !validGrades.includes(level2)) {
+      toast.error('고객 단가 산정 중 오류!! 풍원에 문의하세요!!')
+      return
+    }
+
     const qtyStr = quantities[product.product_id]
     if (!qtyStr || parseInt(qtyStr) === 0) { toast.error('수량을 입력하세요.'); return }
     const inputQty = parseInt(qtyStr)

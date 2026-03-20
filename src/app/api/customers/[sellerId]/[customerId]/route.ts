@@ -14,6 +14,12 @@ export async function PATCH(
 
   try {
     const body = await request.json()
+
+    // level1, level2가 전달된 경우 빈 값 불허
+    if (('level1' in body && !body.level1) || ('level2' in body && !body.level2)) {
+      return NextResponse.json({ error: '일반가 등급(level1)과 마대가 등급(level2)은 필수입니다.' }, { status: 400 })
+    }
+
     const { error } = await supabase
       .from('customers')
       .update({

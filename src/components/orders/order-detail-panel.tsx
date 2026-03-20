@@ -339,6 +339,20 @@ export function OrderDetailPanel({ order, onClose, onStatusChanged }: Props) {
                 주문 취소
               </Button>
             ) : null}
+
+            {/* 수령 취소: 판매회사 + 본인 주문건만 */}
+            {isSeller && status === '수령' && order.orderer_id === user?.userId && (
+              <Button size="sm" variant="destructive" onClick={() => handleStatusChange('수령 취소')} disabled={actionLoading}>
+                수령 취소
+              </Button>
+            )}
+
+            {/* 완료 취소: 판매회사 + 본인 주문건만 */}
+            {isSeller && status === '완료' && order.orderer_id === user?.userId && (
+              <Button size="sm" variant="destructive" onClick={() => handleStatusChange('완료 취소')} disabled={actionLoading}>
+                완료 취소
+              </Button>
+            )}
           </div>
         )}
       </CardContent>

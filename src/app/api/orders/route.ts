@@ -52,23 +52,65 @@ export async function GET(request: NextRequest) {
       const { data, error } = await query
       if (error) throw error
 
-      // 고객명 매핑 (별도 조회)
+      // 주문 데이터 보강 (고객명, 판매사명, 주문자명, 대표물건)
       const orders = data || []
       if (orders.length > 0) {
+        // 1. 고객명 매핑
         const customerIds = [...new Set(orders.map(o => o.customer_id).filter(Boolean))]
         const { data: customers } = await supabase
           .from('customers')
           .select('customer_id, customer_name')
           .eq('seller_id', sellerId)
           .in('customer_id', customerIds)
-
         const customerMap = new Map(
           (customers || []).map(c => [c.customer_id, c.customer_name])
         )
 
+        // 2. 판매사명 매핑
+        const { data: sellerCompany } = await supabase
+          .from('companies')
+          .select('company_id, company_alias, company_name')
+          .eq('company_id', sellerId)
+          .single()
+        const sellerName = sellerCompany?.company_alias || sellerCompany?.company_name || sellerId
+
+        // 3. 주문자명 매핑
+        const ordererIds = [...new Set(orders.map(o => o.orderer_id).filter(Boolean))]
+        let ordererMap = new Map<string, string>()
+        if (ordererIds.length > 0) {
+          const { data: orderers } = await supabase
+            .from('users')
+            .select('user_id, user_name')
+            .in('user_id', ordererIds)
+          ordererMap = new Map(
+            (orderers || []).map(u => [u.user_id, u.user_name])
+          )
+        }
+
+        // 4. 대표물건 매핑 (orders_d에서 sequence=1인 행의 attribute 조합)
+        const orderIds = orders.map(o => o.order_id)
+        const { data: firstItems } = await supabase
+          .from('orders_d')
+          .select('order_id, attribute01, attribute02, attribute03, attribute04, attribute05')
+          .eq('seller_id', sellerId)
+          .in('order_id', orderIds)
+          .eq('sequence', 1)
+        const itemMap = new Map<string, string>()
+        if (firstItems) {
+          for (const item of firstItems) {
+            const parts = [item.attribute01, item.attribute02, item.attribute03, item.attribute04, item.attribute05]
+              .filter(Boolean)
+              .join(' ')
+            itemMap.set(item.order_id, parts)
+          }
+        }
+
         const enriched = orders.map(order => ({
           ...order,
           customer_name: customerMap.get(order.customer_id) || order.customer_id,
+          seller_name: sellerName,
+          orderer_name: ordererMap.get(order.orderer_id) || '',
+          representative_item: itemMap.get(order.order_id) || '',
         }))
 
         return NextResponse.json(enriched)
@@ -119,10 +161,40 @@ export async function GET(request: NextRequest) {
         query = query.order('order_date', { ascending: false }).order('order_time', { ascending: false })
 
         const { data } = await query
-        if (data) {
+        if (data && data.length > 0) {
+          // 주문자명 매핑
+          const oIds = [...new Set(data.map(o => o.orderer_id).filter(Boolean))]
+          let oMap = new Map<string, string>()
+          if (oIds.length > 0) {
+            const { data: orderers } = await supabase
+              .from('users')
+              .select('user_id, user_name')
+              .in('user_id', oIds)
+            oMap = new Map((orderers || []).map(u => [u.user_id, u.user_name]))
+          }
+
+          // 대표물건 매핑
+          const dOrderIds = data.map(o => o.order_id)
+          const { data: firstItems } = await supabase
+            .from('orders_d')
+            .select('order_id, attribute01, attribute02, attribute03, attribute04, attribute05')
+            .eq('seller_id', contract.seller_id)
+            .in('order_id', dOrderIds)
+            .eq('sequence', 1)
+          const iMap = new Map<string, string>()
+          if (firstItems) {
+            for (const item of firstItems) {
+              const parts = [item.attribute01, item.attribute02, item.attribute03, item.attribute04, item.attribute05]
+                .filter(Boolean).join(' ')
+              iMap.set(item.order_id, parts)
+            }
+          }
+
           allOrders.push(...data.map(order => ({
             ...order,
             seller_name: contract.seller_alias || contract.seller_id,
+            orderer_name: oMap.get(order.orderer_id) || '',
+            representative_item: iMap.get(order.order_id) || '',
           })))
         }
       }

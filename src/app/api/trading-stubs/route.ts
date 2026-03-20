@@ -20,7 +20,7 @@ export async function GET(request: NextRequest) {
   try {
     let query = supabase
       .from('trading_stubs_m')
-      .select('*, customers!inner ( customer_name )')
+      .select('*')
       .eq('seller_id', sellerId)
 
     if (dateFrom) query = query.gte('issue_date', dateFrom)
@@ -31,7 +31,24 @@ export async function GET(request: NextRequest) {
 
     const { data, error } = await query
     if (error) throw error
-    return NextResponse.json(data || [])
+
+    // 고객명 별도 조회
+    const stubs = data || []
+    if (stubs.length > 0) {
+      const custIds = [...new Set(stubs.map(s => s.customer_id).filter(Boolean))]
+      const { data: customers } = await supabase
+        .from('customers')
+        .select('customer_id, customer_name')
+        .eq('seller_id', sellerId)
+        .in('customer_id', custIds)
+      const custMap = new Map((customers || []).map(c => [c.customer_id, c.customer_name]))
+      const enriched = stubs.map(s => ({
+        ...s,
+        customer_name: custMap.get(s.customer_id) || s.customer_id,
+      }))
+      return NextResponse.json(enriched)
+    }
+    return NextResponse.json(stubs)
   } catch (error) {
     console.error('GET /api/trading-stubs error:', error)
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
