@@ -149,7 +149,7 @@ export async function GET(request: NextRequest) {
 
           query = query
             .gte('order_date', lookbackStr)
-            .or('status.eq.견적 요청,status.eq.견적 응답,status.eq.주문,status.eq.입고 대기중,status.like.%준비됨%')
+            .or('status.eq.견적 요청,status.eq.견적 응답,status.eq.주문,status.eq.입고 대기중,status.like.%준비됨%,status.eq.수령,status.like.%취소%')
         } else if (status && status !== '전체') {
           if (status === '준비됨') {
             query = query.like('status', '%준비됨%')

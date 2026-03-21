@@ -91,7 +91,8 @@ CREATE TABLE users (
   request_time timestamptz,
   approve_id varchar(21),
   approve_time timestamptz,
-  email_address varchar(45)
+  email_address varchar(45),
+  is_admin boolean DEFAULT false   -- 신비서 시스템 관리자 여부
 );
 
 CREATE INDEX idx_users_company ON users(company_id);

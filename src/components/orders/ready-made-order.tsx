@@ -6,6 +6,7 @@ import { useCartStore } from '@/stores/cart-store'
 import { Cart } from './cart'
 import { SELLER_COMPANIES, PRICE_GRADES } from '@/lib/constants'
 import type { Customer } from '@/lib/types'
+import { CustomerSearchSelect } from '@/components/ui/customer-search-select'
 import { toast } from 'sonner'
 
 interface ProductWithPrice {
@@ -149,25 +150,12 @@ export function ReadyMadeOrder() {
         <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
           <span style={{ fontWeight: 'bold', fontSize: '13px' }}>거래처:</span>
           {isSeller ? (
-            <>
-              <input
-                type="text"
-                style={{ padding: '2px', fontSize: '14px', width: '100px', backgroundColor: 'whitesmoke', border: 'none' }}
-                placeholder="거래처 검색"
-              />
-              <select
+              <CustomerSearchSelect
+                customers={customers}
                 value={selectedCustomerId}
-                onChange={(e) => setSelectedCustomerId(e.target.value)}
-                style={{ padding: '2px', fontSize: '14px' }}
-              >
-                <option value="">선택</option>
-                {customers.map(c => (
-                  <option key={c.customer_id} value={c.customer_id}>
-                    {c.customer_name}({c.owner_name})
-                  </option>
-                ))}
-              </select>
-            </>
+                onChange={(id) => setSelectedCustomerId(id)}
+                width="200px"
+              />
           ) : (
             <select
               value={selectedSellerId}

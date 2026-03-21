@@ -22,7 +22,7 @@ export function useAuth() {
       const { data: dbUser } = await supabase
         .from('users')
         .select(`
-          user_id, user_name, mobile_number, email_address, power, status, company_id,
+          user_id, user_name, mobile_number, email_address, power, status, company_id, is_admin,
           companies ( company_name, company_alias, power )
         `)
         .eq('auth_uid', authUser.id)
@@ -49,6 +49,7 @@ export function useAuth() {
         companyAlias: company?.company_alias || '',
         companyPower: company?.power as AuthUser['companyPower'],
         userPower: dbUser.power as AuthUser['userPower'],
+        isSysAdmin: dbUser.is_admin === true,
       })
       setLoading(false)
     }
@@ -61,6 +62,7 @@ export function useAuth() {
   const isOwner = user?.userPower === '대표'
   const isAdmin = user?.userPower === '관리자'
   const isStaff = user?.userPower === '직원'
+  const isSysAdmin = user?.isSysAdmin === true
 
   return {
     user,
@@ -70,6 +72,7 @@ export function useAuth() {
     isOwner,
     isAdmin,
     isStaff,
+    isSysAdmin,
     // 복합 권한
     canViewCustomers: isOwner || isAdmin,
     canSearchAllOrders: isOwner,

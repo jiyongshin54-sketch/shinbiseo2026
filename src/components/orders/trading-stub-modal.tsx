@@ -14,6 +14,7 @@ interface Props {
 interface StubDetail {
   sequence: number
   category_id: string | null
+  category_name: string | null
   description: string | null
   standard: string | null
   unit_price: number
@@ -189,8 +190,8 @@ export function TradingStubModal({ order, open, onClose }: Props) {
           </div>
         </div>
 
-        {/* 명세표 본문 - 스크롤 없이 꽉 차게 */}
-        <div className="flex-1 bg-white px-5 pt-4 pb-2 flex flex-col min-h-0 overflow-hidden">
+        {/* 명세표 본문 */}
+        <div className="flex-1 bg-white px-5 pt-4 pb-2 flex flex-col min-h-0 overflow-auto">
           {loading ? (
             <div className="flex-1 flex items-center justify-center text-gray-400">
               <svg className="animate-spin h-6 w-6 mr-2" viewBox="0 0 24 24">
@@ -201,7 +202,7 @@ export function TradingStubModal({ order, open, onClose }: Props) {
             </div>
           ) : stub ? (
             <>
-              <div ref={printRef} className="flex flex-col flex-1 min-h-0">
+              <div ref={printRef}>
                 <StubDocument stub={stub} />
               </div>
               <div className="text-center text-gray-400 text-xs py-2 shrink-0">
@@ -244,13 +245,13 @@ function StubDocument({ stub }: { stub: StubData }) {
     ['전화', s.phone, b.phone],
   ]
 
-  // 빈 행 수: 최소 10행, 데이터가 10개 이상이면 0
-  const emptyRows = Math.max(0, 10 - stub.items.length)
+  // 빈 행 수: 최소 6행
+  const emptyRows = Math.max(0, 6 - stub.items.length)
 
   return (
-    <div style={{ fontFamily: "'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif", display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
+    <div style={{ fontFamily: "'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif" }}>
       {/* 외곽 테두리 */}
-      <div style={{ border: '2px solid #333', display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
+      <div style={{ border: '2px solid #333' }}>
 
         {/* ===== 제목 + 일자 ===== */}
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
@@ -314,8 +315,8 @@ function StubDocument({ stub }: { stub: StubData }) {
         </table>
 
         {/* ===== 품목 + 하단 합계 (하나의 테이블로 통합) ===== */}
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', flex: 1, tableLayout: 'fixed' }}>
+        <div>
+          <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
             <colgroup>
               <col style={{ width: '5%' }} />
               <col style={{ width: '28%' }} />
@@ -342,7 +343,7 @@ function StubDocument({ stub }: { stub: StubData }) {
               {stub.items.map((item, idx) => (
                 <tr key={idx}>
                   <td style={{ ...c({ textAlign: 'center' }), borderLeft: 'none' }}>{idx + 1}</td>
-                  <td style={c({ fontSize: '11px' })}>{item.category_id || ''}</td>
+                  <td style={c({ fontSize: '11px' })}>{item.category_name || item.category_id || ''}</td>
                   <td style={c()}>{item.description || ''}</td>
                   <td style={c()}>{item.standard || ''}</td>
                   <td style={c({ textAlign: 'right' })}>{Number(item.unit_price).toLocaleString()}</td>
@@ -353,7 +354,7 @@ function StubDocument({ stub }: { stub: StubData }) {
               ))}
               {/* 빈 행 */}
               {Array.from({ length: emptyRows }).map((_, idx) => (
-                <tr key={`e-${idx}`} style={idx === emptyRows - 1 ? { height: '100%' } : undefined}>
+                <tr key={`e-${idx}`}>
                   <td style={{ ...c(), borderLeft: 'none' }}>&nbsp;</td>
                   <td style={c()}>&nbsp;</td>
                   <td style={c()}>&nbsp;</td>

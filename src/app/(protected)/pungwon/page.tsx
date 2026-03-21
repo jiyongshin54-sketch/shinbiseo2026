@@ -41,7 +41,6 @@ export default function PungwonPage() {
   const [selectedCustomerId, setSelectedCustomerId] = useState('')
   const [searchKeyword, setSearchKeyword] = useState('')
   const [products, setProducts] = useState<ProductRow[]>([])
-  const [allProducts, setAllProducts] = useState<ProductRow[]>([])
   const [productsLoading, setProductsLoading] = useState(false)
   const [quantities, setQuantities] = useState<Record<string, string>>({})
   const [orderStatus, setOrderStatus] = useState('주문')
@@ -72,14 +71,6 @@ export default function PungwonPage() {
     finally { setProductsLoading(false) }
   }, [isSeller, isBuyer, user, selectedCustomerId, customers, searchKeyword])
 
-  // 단가표용 전체 로드
-  useEffect(() => {
-    if (tab !== 'price-list') return
-    const params = new URLSearchParams({ seller_id: PUNGWON_ID })
-    if (isBuyer && user?.companyId) params.set('buyer_company_id', user.companyId)
-    fetch(`/api/products?${params}`)
-      .then(r => r.json()).then(d => { if (Array.isArray(d)) setAllProducts(d) })
-  }, [tab, isBuyer, user])
 
   const addToCart = (p: ProductRow) => {
     const qtyStr = quantities[p.product_id]
@@ -123,7 +114,6 @@ export default function PungwonPage() {
         {([
           { key: 'ready-made' as TabType, label: '기성품 주문' },
           { key: 'custom' as TabType, label: '맞춤품 주문' },
-          { key: 'price-list' as TabType, label: '기성품 단가표' },
           { key: 'back' as TabType, label: '신BS로 돌아가기' },
         ]).map(t => (
           <button
@@ -256,43 +246,6 @@ export default function PungwonPage() {
         />
       )}
 
-      {/* === 기성품 단가표 탭 === */}
-      {tab === 'price-list' && (
-        <div style={{ maxHeight: '700px', overflowY: 'auto', border: '1px solid silver', marginTop: '5px' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
-            <thead>
-              <tr style={{ backgroundColor: '#ccffcc', position: 'sticky', top: 0 }}>
-                <th style={thStyle}>No</th>
-                <th style={thStyle}>Category</th>
-                <th style={thStyle}>품명</th>
-                <th style={thStyle}>색깔</th>
-                <th style={thStyle}>두께</th>
-                <th style={thStyle}>사이즈</th>
-                <th style={thStyle}>마대수량</th>
-                <th style={thStyle}>일반가</th>
-                <th style={thStyle}>마대가</th>
-              </tr>
-            </thead>
-            <tbody>
-              {allProducts.length === 0 ? (
-                <tr><td colSpan={9} style={{ padding: '20px', textAlign: 'center' }}>로딩 중...</td></tr>
-              ) : allProducts.map((p, i) => (
-                <tr key={p.product_id} className="hover:bg-gray-100">
-                  <td style={{ ...tdStyle, textAlign: 'center' }}>{i + 1}</td>
-                  <td style={tdStyle}>{p.categories?.category_m || ''}</td>
-                  <td style={tdStyle}>{p.attribute01}</td>
-                  <td style={tdStyle}>{p.attribute02}</td>
-                  <td style={tdStyle}>{p.attribute03}</td>
-                  <td style={tdStyle}>{p.attribute04}</td>
-                  <td style={{ ...tdStyle, textAlign: 'right' }}>{p.madae_criteria?.toLocaleString()}</td>
-                  <td style={{ ...tdStyle, textAlign: 'right' }}>{p.unit_price_level1}</td>
-                  <td style={{ ...tdStyle, textAlign: 'right' }}>{p.unit_price_level2}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
     </div>
   )
 }
@@ -304,3 +257,4 @@ const thStyle: React.CSSProperties = {
 const tdStyle: React.CSSProperties = {
   padding: '3px 5px', border: '1px solid silver', whiteSpace: 'nowrap', fontSize: '12px',
 }
+

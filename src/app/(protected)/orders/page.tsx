@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useAuth } from '@/hooks/use-auth'
 import { OrderDetailPanel } from '@/components/orders/order-detail-panel'
+import { CustomerSearchSelect } from '@/components/ui/customer-search-select'
 import { toast } from 'sonner'
 const ORDER_STATUS_LIST = ['전체', '집계', '결산', '주문', '준비됨', '수령', '완료', '취소', '견적']
 import type { OrderMaster } from '@/lib/types'
@@ -19,15 +20,28 @@ export default function OrdersPage() {
 
   const [viewMode, setViewMode] = useState('판매 내역')
   const [dateFrom, setDateFrom] = useState(() => {
-    const d = new Date(); d.setMonth(d.getMonth() - 1)
-    return d.toISOString().split('T')[0]
+    const d = new Date()
+    const first = new Date(d.getFullYear(), d.getMonth(), 1)
+    return `${first.getFullYear()}-${String(first.getMonth()+1).padStart(2,'0')}-${String(first.getDate()).padStart(2,'0')}`
   })
-  const [dateTo, setDateTo] = useState(() => new Date().toISOString().split('T')[0])
+  const [dateTo, setDateTo] = useState(() => {
+    const d = new Date()
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
+  })
   const [statusFilter, setStatusFilter] = useState('')
   const [readyMadeFilter, setReadyMadeFilter] = useState('')
   const [customerFilter, setCustomerFilter] = useState('')
   const [paymentMethodFilter, setPaymentMethodFilter] = useState('')
   const [paymentTypeFilter, setPaymentTypeFilter] = useState('')
+  const [customers, setCustomers] = useState<{customer_id: string, customer_name: string, owner_name: string}[]>([])
+
+  // 거래처 목록 로드
+  useEffect(() => {
+    if (!user) return
+    fetch(`/api/customers?seller_id=${user.companyId}`)
+      .then(res => res.json())
+      .then(data => { if (Array.isArray(data)) setCustomers(data) })
+  }, [user])
 
   const fetchOrders = useCallback(async () => {
     if (!user) return
@@ -75,13 +89,17 @@ export default function OrdersPage() {
     }
   }, [user, isSeller, isOwner, viewMode, dateFrom, dateTo, statusFilter, readyMadeFilter, customerFilter, paymentMethodFilter, paymentTypeFilter])
 
-  useEffect(() => { fetchOrders() }, [fetchOrders])
+  // 자동 조회 제거 - 검색 버튼 클릭 시에만 조회
+  // useEffect(() => { fetchOrders() }, [fetchOrders])
+
+  const toLocalDateStr = (d: Date) =>
+    `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
 
   const setQuickDate = (type: string) => {
     const now = new Date()
     let from: Date, to: Date
     switch (type) {
-      case '어제': from = to = new Date(now.getTime() - 86400000); break
+      case '어제': from = to = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1); break
       case '오늘': from = to = now; break
       case '지난달':
         from = new Date(now.getFullYear(), now.getMonth() - 1, 1)
@@ -90,8 +108,8 @@ export default function OrdersPage() {
         from = new Date(now.getFullYear(), now.getMonth(), 1); to = now; break
       default: return
     }
-    setDateFrom(from.toISOString().split('T')[0])
-    setDateTo(to.toISOString().split('T')[0])
+    setDateFrom(toLocalDateStr(from))
+    setDateTo(toLocalDateStr(to))
   }
 
   // --- 주문 수정 (인라인) ---
@@ -152,46 +170,52 @@ export default function OrdersPage() {
   return (
     <div>
       {/* 구 앱 주문관리 2행 필터 (silver 배경) */}
-      <div style={{ backgroundColor: 'silver', padding: '5px 8px', marginBottom: '2px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap', marginBottom: '5px' }}>
-          <span style={{ fontSize: '13px' }}>조회구분:</span>
+      <div style={{ backgroundColor: '#e8eef4', padding: '5px 8px', marginBottom: '2px', border: '1px solid #c0c8d0' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+          <span style={{ fontSize: '13px', fontWeight: 'bold', color: '#333' }}>구분:</span>
           <select value={viewMode} onChange={(e) => setViewMode(e.target.value)} style={ddlStyle}>
             <option>판매 내역</option>
             <option>구매 내역</option>
           </select>
-          <span style={{ fontSize: '13px' }}>기준일자:</span>
+          <span style={{ fontSize: '13px', fontWeight: 'bold', color: '#333' }}>기준일자:</span>
           <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} style={{ ...ddlStyle, width: '130px' }} />
           <span>~</span>
           <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} style={{ ...ddlStyle, width: '130px' }} />
-          {['어제', '오늘', '지난달', '이번달'].map(q => (
+          {['어제', '오늘', '지난달'].map(q => (
             <button key={q} onClick={() => setQuickDate(q)} style={{ color: 'blue', textDecoration: 'underline', background: 'none', border: 'none', cursor: 'pointer', fontSize: '13px' }}>{q}</button>
           ))}
-          <span style={{ fontSize: '13px' }}>거래처:</span>
-          <input type="text" value={customerFilter} onChange={(e) => setCustomerFilter(e.target.value)} style={{ ...ddlStyle, width: '100px' }} />
-          <button onClick={fetchOrders} style={{ padding: '4px 20px', fontWeight: 'bold', fontSize: '14px', cursor: 'pointer' }}>검색</button>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-          <span style={{ fontSize: '13px' }}>기성여부:</span>
+          <span style={{ fontSize: '13px', fontWeight: 'bold', color: '#333' }}>거래처:</span>
+          <CustomerSearchSelect
+            customers={customers}
+            value={customerFilter}
+            onChange={(id, name) => setCustomerFilter(name || id || '')}
+            showAll={true}
+            width="200px"
+          />
+          <span style={{ fontSize: '13px', fontWeight: 'bold', color: '#333' }}>기성여부:</span>
           <select value={readyMadeFilter} onChange={(e) => setReadyMadeFilter(e.target.value)} style={ddlStyle}>
             <option value="">전체</option>
             {READY_MADE_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}
           </select>
-          <span style={{ fontSize: '13px' }}>결제수단:</span>
+          <span style={{ fontSize: '13px', fontWeight: 'bold', color: '#333' }}>결제수단:</span>
           <select value={paymentMethodFilter} onChange={(e) => setPaymentMethodFilter(e.target.value)} style={ddlStyle}>
             <option value="">전체</option>
             <option value="현금">현금</option><option value="수금">수금</option>
             <option value="카드">카드</option><option value="이체">이체</option>
           </select>
-          <span style={{ fontSize: '13px' }}>주문상태:</span>
+          <span style={{ fontSize: '13px', fontWeight: 'bold', color: '#333' }}>주문상태:</span>
           <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} style={ddlStyle}>
             <option value="">전체</option>
             {ORDER_STATUS_LIST.map(s => <option key={s} value={s}>{s}</option>)}
           </select>
-          <span style={{ fontSize: '13px' }}>거래처 결제방식:</span>
+          <span style={{ fontSize: '13px', fontWeight: 'bold', color: '#333' }}>결제방식:</span>
           <select value={paymentTypeFilter} onChange={(e) => setPaymentTypeFilter(e.target.value)} style={ddlStyle}>
             <option value="">전체</option>
             <option value="일결제">일결제</option><option value="월결제">월결제</option>
           </select>
+          <div style={{ marginLeft: 'auto' }}>
+            <button onClick={fetchOrders} style={{ padding: '5px 30px', fontWeight: 'bold', fontSize: '14px', cursor: 'pointer', backgroundColor: '#2563eb', color: 'white', border: 'none', borderRadius: '3px' }}>검색</button>
+          </div>
         </div>
       </div>
 

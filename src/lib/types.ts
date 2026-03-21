@@ -15,6 +15,7 @@ export interface AuthUser {
   companyAlias: string
   companyPower: CompanyPower
   userPower: UserPower
+  isSysAdmin: boolean
 }
 
 // ===== DB 테이블 타입 =====

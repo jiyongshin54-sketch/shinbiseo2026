@@ -90,7 +90,8 @@ export async function GET(request: NextRequest) {
     // 7. 응답 구성
     const items = (orderDetails || []).map(d => ({
       sequence: d.sequence,
-      category_id: categoryMap[d.category_id] || d.category_id || '',
+      category_id: d.category_id || '',
+      category_name: categoryMap[d.category_id] || d.category_id || '',
       description: d.attribute01 || '',
       standard: d.attribute04 || '',
       unit_price: Number(d.price) || 0,
@@ -111,21 +112,21 @@ export async function GET(request: NextRequest) {
       items: existingStub ? undefined : items, // 기존 발급분이면 detail에서 가져옴
       seller: {
         company_name: sellerCompany?.company_name || '',
-        biz_no: sellerCompany?.biz_no || '',
-        representative: sellerCompany?.representative || '',
+        biz_no: sellerCompany?.business_id || '',
+        representative: sellerCompany?.owner_name || '',
         address: sellerCompany?.address || '',
-        biz_type: sellerCompany?.biz_type || '',
-        biz_category: sellerCompany?.biz_category || '',
-        phone: sellerCompany?.phone || '',
+        biz_type: sellerCompany?.uptae || '',
+        biz_category: sellerCompany?.jongmok || '',
+        phone: sellerCompany?.phone_number || '',
       },
       buyer: {
         company_name: customer?.customer_name || buyerCompany?.company_name || '',
-        biz_no: buyerCompany?.biz_no || '',
-        representative: buyerCompany?.representative || customer?.customer_name || '',
-        address: buyerCompany?.address || '',
-        biz_type: buyerCompany?.biz_type || '',
-        biz_category: buyerCompany?.biz_category || '',
-        phone: buyerCompany?.phone || '',
+        biz_no: customer?.business_id || buyerCompany?.business_id || '',
+        representative: customer?.owner_name || buyerCompany?.owner_name || '',
+        address: customer?.address || buyerCompany?.address || '',
+        biz_type: customer?.uptae || buyerCompany?.uptae || '',
+        biz_category: customer?.jongmok || buyerCompany?.jongmok || '',
+        phone: customer?.phone_number || buyerCompany?.phone_number || '',
       },
     }
 
@@ -137,9 +138,25 @@ export async function GET(request: NextRequest) {
         .eq('ts_id', existingStub.ts_id)
         .order('sequence', { ascending: true })
 
+      // 기존 발급분의 카테고리명 조회
+      const stubCatIds = [...new Set((stubDetails || []).map((d: Record<string, string>) => d.category_id).filter(Boolean))]
+      let stubCategoryMap: Record<string, string> = {}
+      if (stubCatIds.length > 0) {
+        const { data: stubCats } = await supabase
+          .from('categories')
+          .select('category_id, category_l, category_m, category_s')
+          .in('category_id', stubCatIds)
+        if (stubCats) {
+          stubCategoryMap = Object.fromEntries(
+            stubCats.map(c => [c.category_id, [c.category_l, c.category_m, c.category_s].filter(Boolean).join(' - ')])
+          )
+        }
+      }
+
       result.items = (stubDetails || []).map(d => ({
         sequence: d.sequence,
         category_id: d.category_id || '',
+        category_name: stubCategoryMap[d.category_id] || d.category_id || '',
         description: d.description || '',
         standard: d.standard || '',
         unit_price: Number(d.unit_price) || 0,

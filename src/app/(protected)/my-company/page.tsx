@@ -9,6 +9,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Badge } from '@/components/ui/badge'
 import { CustomerManagement } from '@/components/customers/customer-management'
+import { AnnouncementManager } from '@/components/announcements/announcement-manager'
+import { PriceList } from '@/components/products/price-list'
 import type { Company, User } from '@/lib/types'
 import { toast } from 'sonner'
 
@@ -122,14 +124,14 @@ export default function MyCompanyPage() {
   const activeMembers = members.filter(m => m.status === '승인')
 
   return (
-    <div className="space-y-6">
-      <h2 className="text-2xl font-bold">내 회사 설정</h2>
-
+    <div className="space-y-4">
       <Tabs defaultValue="info">
         <TabsList>
           <TabsTrigger value="info">회사 정보</TabsTrigger>
           {canManageStaff && <TabsTrigger value="members">직원 관리 {pendingMembers.length > 0 && `(${pendingMembers.length})`}</TabsTrigger>}
           {canViewCustomers && <TabsTrigger value="customers">거래처 관리</TabsTrigger>}
+          {isSeller && <TabsTrigger value="price-list">기성품 단가표</TabsTrigger>}
+          {isOwner && <TabsTrigger value="announcements">공지사항 관리</TabsTrigger>}
         </TabsList>
 
         {/* 회사 정보 */}
@@ -280,6 +282,24 @@ export default function MyCompanyPage() {
         {canViewCustomers && (
           <TabsContent value="customers">
             <CustomerManagement />
+          </TabsContent>
+        )}
+
+        {/* 기성품 단가표 */}
+        {isSeller && (
+          <TabsContent value="price-list">
+            <PriceList />
+          </TabsContent>
+        )}
+
+        {/* 공지사항 관리 */}
+        {isOwner && (
+          <TabsContent value="announcements">
+            <Card>
+              <CardContent className="pt-4">
+                <AnnouncementManager companyId={user.companyId} userName={user.userName} />
+              </CardContent>
+            </Card>
           </TabsContent>
         )}
       </Tabs>

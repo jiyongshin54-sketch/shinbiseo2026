@@ -2,7 +2,7 @@
 
 ## 프로젝트 개요
 - **현행**: ASP.NET WebForms (new.shinbiseo.com)
-- **목표**: Next.js 15 (App Router) + Supabase + Tailwind CSS + shadcn/ui
+- **목표**: Next.js 16 (App Router) + Supabase + Tailwind CSS 4 + shadcn/ui
 - **배포**: Vercel + Supabase Cloud
 - **인증**: Supabase Auth (Google Provider)
 - **원칙**: 클론코딩 우선 → 이후 보완/범용화
@@ -19,6 +19,11 @@
 - **대표**: 모든 기능 + 직원관리(승인/삭제)
 - **관리자**: 대부분 기능 (직원관리 제외)
 - **직원**: 기본 기능 (자기 주문만 조회, 금액 일부 마스킹)
+
+### 시스템 관리자 (Users.is_admin)
+- **is_admin = true**: 신비서 시스템 전체 관리자
+- 사용자/회사 승인, 회사 전환(테스트), 시스템 공지사항 관리
+- 헤더의 "관리자" 버튼으로 `/admin` 페이지 접근
 
 ### Customers vs Companies 관계
 - Companies: 신비서에 가입한 회사 (CompanyID 보유)
@@ -75,19 +80,20 @@ PlaceHolder별 화면:
 
 | 구 앱 화면 | Next.js Route | 구현상태 |
 |-----------|---------------|---------|
-| main화면PH | /main | ⚠️ 구조 수정 필요 |
-| 거래처관리PH | /customers | ⚠️ 별도 페이지 분리 필요 |
-| 거래명세표PH | /trading-stubs | 🔴 신규 |
-| 세금계산서PH | /e-tax-bill | 🔴 신규 |
-| 주문관리PH | /orders | 🔴 신규 |
-| SellerOrder기성PH | /ready-made-order | ⚠️ 별도 페이지 분리 필요 |
-| SellerOrder맞춤PH | /custom-order | ⚠️ 별도 페이지 분리 필요 |
-| 우리회사PH | /my-company | ⚠️ 보강 필요 |
-| Pungwon.aspx | /pungwon | 🔴 미구현 |
+| main화면PH | /main | ✅ 완료 (전광판+공지사항) |
+| 거래처관리PH | /customers | ✅ 완료 (좌우 분할, 미수금 포함) |
+| 거래명세표PH | /trading-stubs | ✅ 완료 (발행/수정/인쇄) |
+| 세금계산서PH | /e-tax-bill | 🔴 미구현 |
+| 주문관리PH | /orders | ✅ 완료 (필터/검색/인라인수정) |
+| SellerOrder기성PH | /ready-made-order | ✅ 완료 |
+| SellerOrder맞춤PH | /custom-order | ✅ 완료 |
+| 우리회사PH | /my-company | ✅ 완료 (회사정보/직원/단가표/공지) |
+| Pungwon.aspx | /pungwon | ✅ 완료 (기성/맞춤/단가표) |
 | Reground.aspx | /reground | 🔴 미구현 |
-| MyCompany.aspx | /my-company-admin | 🔴 신규 (판매회사 전용) |
-| Billing.aspx | /billing | ⚠️ 보강 |
-| eTaxBill.aspx | /trading-stub-print | ⚠️ 보강 |
+| MyCompany.aspx | /my-company-admin | ✅ 완료 → /my-company로 통합 |
+| Billing.aspx | /billing | ✅ 완료 (일결제/월결제 미수금) |
+| eTaxBill.aspx | /trading-stub-print | ✅ 완료 (2025 스타일) |
+| (신규) 관리자 | /admin | ✅ 완료 (사용자/회사 승인, 회사전환) |
 
 ---
 
@@ -154,24 +160,23 @@ PlaceHolder별 화면:
 
 ---
 
-## 개발 우선순위 (현재 상태 기준)
+## 구현 현황 (2026.03 기준)
 
-### 즉시 수정 (구조 변경)
-1. 네비게이션: 8개 메뉴탭 + 구 앱 스타일
-2. 메인 페이지: 전광판만 (좌우 2분할 레이아웃)
-3. 기성품/맞춤품/거래처: 메인에서 분리 → 독립 페이지
+### ✅ 완료
+1. 네비게이션: 8개 메뉴탭 + 활성 탭 하이라이트 (하늘색)
+2. 메인 페이지: 좌(판매회사 공지사항) + 우(전광판)
+3. 기성품/맞춤품/거래처: 독립 페이지 분리 완료
+4. 주문 관리: 검색/필터/인라인수정/거래처 콤보박스
+5. 거래명세표: 발행/수정/인쇄 (2025 스타일 양식)
+6. 풍원 딜러네트워크: 기성품/맞춤품/단가표
+7. 우리회사관리: 회사정보/직원/단가표/공지사항 통합
+8. 거래처관리: 좌우 분할(거래처+미수금), 거래내역 모달
+9. 미수금 관리: 일결제/월결제 분류, 청구서 출력
+10. 관리자: 사용자/회사 승인, 회사 전환(테스트)
+11. 전광판: 30초 자동 새로고침, 상태 필터, 판매/구매 구분
 
-### 신규 구현 필요
-1. 주문 관리 (검색/필터/일괄처리)
-2. 거래명세표 관리 (등록/수정/출력)
-3. 세금계산서 관리
-4. 풍원/오픈패키지 딜러네트워크
-5. MyCompany (상품/재고/거래처/직원)
-
-### 보강 필요
-1. 전광판 상태 필터 (7개 옵션)
-2. 주문 상세: 품목별 준비/재고없음
-3. 주문 수정 기능
-4. 도안 파일 업로드/보기
-5. 미수금 관리
-6. 금액 마스킹 (직원용)
+### 🔴 미구현
+1. 세금계산서 관리
+2. 오픈패키지(리그라운드) 딜러네트워크
+3. 도안 파일 업로드/보기
+4. 금액 마스킹 (직원용)

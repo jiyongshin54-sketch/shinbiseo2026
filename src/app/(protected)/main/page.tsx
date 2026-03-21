@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { DisplayBoard } from '@/components/orders/display-board'
+import { CompanyAnnouncementPanel } from '@/components/announcements/company-announcement-panel'
 
 export default async function MainPage() {
   const supabase = await createClient()
@@ -34,78 +35,21 @@ export default async function MainPage() {
                 border: '1px solid dodgerblue',
               }}
             >
-              <h3 style={{ fontSize: '16px', fontWeight: 'bold', marginBottom: '10px' }}>
+              <h3 style={{ fontSize: '14px', fontWeight: 'bold', marginBottom: '5px' }}>
                 주요 판매회사 바로가기
               </h3>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-                {/* 풍원비닐 */}
-                <a
-                  href="/pungwon"
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '10px',
-                    padding: '10px',
-                    border: '1px solid #ddd',
-                    borderRadius: '4px',
-                    textDecoration: 'none',
-                    color: 'inherit',
-                  }}
-                  className="hover:bg-gray-50"
-                >
-                  <span style={{ fontWeight: 'bold', fontSize: '14px' }}>풍원비닐</span>
-                  <div
-                    style={{
-                      width: '200px',
-                      height: '60px',
-                      backgroundColor: '#e8f4f8',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      borderRadius: '4px',
-                      color: '#4a90d9',
-                      fontWeight: 'bold',
-                      fontSize: '18px',
-                    }}
-                  >
-                    PW
-                  </div>
-                </a>
+              {/* 오른쪽 필터바 높이만큼 여백 (제목+필터바 = 약 30px) */}
+              <div style={{ height: '28px' }} />
 
-                {/* 오픈패키지 */}
-                <a
-                  href="/reground"
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '10px',
-                    padding: '10px',
-                    border: '1px solid #ddd',
-                    borderRadius: '4px',
-                    textDecoration: 'none',
-                    color: 'inherit',
-                  }}
-                  className="hover:bg-gray-50"
-                >
-                  <span style={{ fontWeight: 'bold', fontSize: '14px' }}>오픈패키지</span>
-                  <div
-                    style={{
-                      width: '200px',
-                      height: '60px',
-                      backgroundColor: '#f0f8e8',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      borderRadius: '4px',
-                      color: '#6b9e3d',
-                      fontWeight: 'bold',
-                      fontSize: '14px',
-                    }}
-                  >
-                    생분해 EL724 리그라운드
-                  </div>
-                </a>
-              </div>
+              {/* 풍원비닐포장 + 공지사항 */}
+              <CompanyAnnouncementPanel
+                companyId="00002"
+                companyName="풍원비닐포장"
+                logoSrc="/images/company-logos/pungwon.png"
+                gradientFrom="#4ade80"
+                gradientTo="#60a5fa"
+                href="/pungwon"
+              />
             </td>
 
             {/* 우측: 내 주문 전광판 */}

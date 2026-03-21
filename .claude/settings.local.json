@@ -1,0 +1,28 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git pull:*)",
+      "Bash(ls -la \"D:\\\\신지용\\\\shinbiseo2026/src/app/\\(protected\\)/\")",
+      "Bash(xargs grep:*)",
+      "Bash(npx next:*)",
+      "Bash(npx tsc:*)",
+      "Bash(ls -la /d/신지용/shinbiseo2026/src/app/\\\\\\(protected\\\\\\)/)",
+      "Bash(ls -la /d/신지용/shinbiseo2026/src/app/\\\\\\(protected\\\\\\)/customers/)",
+      "Bash(find D:/신지용/shinbiseo2026/src/app/api/trading-stubs -type f -name *.ts -o -name *.js -o -name route.*)",
+      "Bash(find '/d/신지용/AWS Renewal/2026/AppRoot/new.shinbiseo.com' -type f \\\\\\(-name *.aspx -o -name *.cs -o -name *.sql \\\\\\))",
+      "Bash(find /d/신지용/shinbiseo2025/app /d/신지용/shinbiseo2025/components -type f \\\\\\(-name *.tsx -o -name *.ts -o -name *.jsx -o -name *.js \\\\\\))",
+      "Bash(find /d/신지용/shinbiseo2025/components -type f \\\\\\(-name *.tsx -o -name *.ts \\\\\\))",
+      "Bash(find /d/신지용/shinbiseo2025/app/api -type f \\\\\\(-name *.ts -o -name *.tsx \\\\\\))",
+      "Bash(find /d/신지용/shinbiseo2025 -name supabaseClient*)",
+      "Bash(find /d/신지용/shinbiseo2025/app -type f \\\\\\(-name *.tsx -o -name *.ts \\\\\\))",
+      "Bash(grep -r 관리자 /d/신지용/shinbiseo2025/app --include=*.tsx --include=*.ts)",
+      "Bash(grep -r 관리자 /d/신지용/shinbiseo2025/components --include=*.tsx --include=*.ts)",
+      "Bash(ls \"D:/신지용/shinbiseo2026/src/app/\\(protected\\)/admin/\")",
+      "Bash(find /d/신지용/shinbiseo2026/src/app/api -name \"route.ts\" -exec grep -l \"export async function\" {})"
+    ],
+    "deny": [
+      "mcp__Claude_Preview__preview_start",
+      "mcp__Claude_Preview__preview_stop"
+    ]
+  }
+}
