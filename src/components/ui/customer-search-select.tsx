@@ -4,8 +4,8 @@ import { useState, useEffect, useRef, useMemo } from 'react'
 
 interface Customer {
   customer_id: string
-  customer_name: string
-  owner_name?: string
+  customer_name: string | null
+  owner_name?: string | null
 }
 
 interface Props {
