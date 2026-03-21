@@ -52,8 +52,8 @@ export function CustomerSearchSelect({ customers, value, onChange, placeholder =
     filtered.forEach(c => {
       items.push({
         id: c.customer_id,
-        name: c.customer_name,
-        label: `${c.customer_id}-${c.customer_name} (${c.owner_name || ''})`,
+        name: c.customer_name || '',
+        label: `${c.customer_id}-${c.customer_name || ''} (${c.owner_name || ''})`,
       })
     })
     return items
