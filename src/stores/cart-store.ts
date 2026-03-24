@@ -29,6 +29,17 @@ interface CartStore {
   setAdjustmentSign: (sign: '+' | '-') => void
   setVatRate: (rate: 0 | 10) => void
   clearCart: () => void
+  loadOrder: (params: {
+    sellerId: string
+    customerId: string
+    customerName: string
+    readyMade: '기성' | '맞춤'
+    orderDate: string
+    comment: string
+    adjustment: number
+    vatRate: 0 | 10
+    items: CartItem[]
+  }) => void
 
   // 계산
   getSumAmount: () => number
@@ -106,6 +117,20 @@ export const useCartStore = create<CartStore>()(
           adjustment: 0,
           adjustmentSign: '+',
           orderDate: getTodayString(),
+        }),
+
+      loadOrder: (params) =>
+        set({
+          sellerId: params.sellerId,
+          customerId: params.customerId,
+          customerName: params.customerName,
+          readyMade: params.readyMade,
+          orderDate: params.orderDate,
+          comment: params.comment,
+          adjustment: Math.abs(params.adjustment),
+          adjustmentSign: params.adjustment >= 0 ? '+' : '-',
+          vatRate: params.vatRate,
+          items: params.items,
         }),
 
       // 계산

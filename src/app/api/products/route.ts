@@ -17,6 +17,7 @@ export async function GET(request: NextRequest) {
   const categoryId = params.get('category_id')
   const categoryM = params.get('category_m')
   const getCategories = params.get('get_categories')
+  const priceList = params.get('price_list')
 
   // 카테고리 목록만 반환
   if (getCategories === 'true') {
@@ -36,6 +37,26 @@ export async function GET(request: NextRequest) {
   const PUNGWON_ID = '00002'
 
   try {
+    // 단가표 모드: 모든 상품 + 모든 단가 컬럼을 그대로 반환
+    if (priceList === 'true') {
+      let query = supabase
+        .from('products')
+        .select('*, categories ( category_l, category_m, category_s )')
+        .eq('seller_id', sellerId)
+
+      if (search) {
+        query = query.or(
+          `attribute01.ilike.%${search}%,attribute02.ilike.%${search}%,attribute04.ilike.%${search}%`
+        )
+      }
+
+      query = query.order('product_id', { ascending: true })
+
+      const { data, error } = await query
+      if (error) throw error
+      return NextResponse.json(data || [])
+    }
+
     // 1. 구매회사의 Level1/Level2 조회
     // 비풍원: 등급 구분 없이 항상 UnitPrice01(3.8급) 사용
     // 풍원: 고객별 Level1/Level2로 등급별 단가 적용

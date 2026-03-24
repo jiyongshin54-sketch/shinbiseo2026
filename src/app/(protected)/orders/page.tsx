@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useAuth } from '@/hooks/use-auth'
 import { OrderDetailPanel } from '@/components/orders/order-detail-panel'
+import { OrderEditModal } from '@/components/orders/order-edit-modal'
 import { CustomerSearchSelect } from '@/components/ui/customer-search-select'
 import { toast } from 'sonner'
 const ORDER_STATUS_LIST = ['전체', '집계', '결산', '주문', '준비됨', '수령', '완료', '취소', '견적']
@@ -112,47 +113,10 @@ export default function OrdersPage() {
     setDateTo(toLocalDateStr(to))
   }
 
-  // --- 주문 수정 (인라인) ---
-  const [editComment, setEditComment] = useState('')
-  const [editPaymentMethod, setEditPaymentMethod] = useState('')
-  const [editPaymentDate, setEditPaymentDate] = useState('')
-  const [editOrderDate, setEditOrderDate] = useState('')
-  const [editSaving, setEditSaving] = useState(false)
-
+  // --- 주문 수정 (모달) ---
   const startEdit = (order: OrderMaster, e: React.MouseEvent) => {
     e.stopPropagation()
     setEditingOrder(order)
-    setEditComment(order.comment || '')
-    setEditPaymentMethod(order.payment_method || '')
-    setEditPaymentDate(order.payment_date || '')
-    setEditOrderDate(order.order_date || '')
-  }
-
-  const saveEdit = async () => {
-    if (!editingOrder) return
-    setEditSaving(true)
-    try {
-      const res = await fetch(`/api/orders/${editingOrder.order_id}/status`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          seller_id: editingOrder.seller_id,
-          comment: editComment,
-          payment_method: editPaymentMethod,
-          payment_date: editPaymentDate,
-          order_date: editOrderDate,
-        }),
-      })
-      if (res.ok) {
-        toast.success('수정 완료')
-        setEditingOrder(null)
-        fetchOrders()
-      } else {
-        const err = await res.json()
-        toast.error(err.error || '수정 실패')
-      }
-    } catch { toast.error('수정 실패') }
-    finally { setEditSaving(false) }
   }
 
   const getRowStyle = (status: string): React.CSSProperties => {
@@ -219,37 +183,18 @@ export default function OrdersPage() {
         </div>
       </div>
 
-      {/* 주문 수정 패널 (인라인) */}
+      {/* 주문 수정 모달 */}
       {editingOrder && (
-        <div style={{ backgroundColor: '#ffffcc', border: '2px solid orange', padding: '10px', marginBottom: '5px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '15px', flexWrap: 'wrap' }}>
-            <strong style={{ fontSize: '13px' }}>주문 수정: {editingOrder.order_id}</strong>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-              <span style={{ fontSize: '12px' }}>거래일자:</span>
-              <input type="text" value={editOrderDate} onChange={e => setEditOrderDate(e.target.value)} style={{ ...ddlStyle, width: '90px' }} />
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-              <span style={{ fontSize: '12px' }}>결제수단:</span>
-              <select value={editPaymentMethod} onChange={e => setEditPaymentMethod(e.target.value)} style={ddlStyle}>
-                <option value="">미정</option>
-                <option value="현금">현금</option><option value="수금">수금</option>
-                <option value="카드">카드</option><option value="이체">이체</option>
-              </select>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-              <span style={{ fontSize: '12px' }}>결제일:</span>
-              <input type="text" value={editPaymentDate} onChange={e => setEditPaymentDate(e.target.value)} style={{ ...ddlStyle, width: '90px' }} />
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-              <span style={{ fontSize: '12px' }}>비고:</span>
-              <input type="text" value={editComment} onChange={e => setEditComment(e.target.value)} style={{ ...ddlStyle, width: '150px' }} />
-            </div>
-            <button onClick={saveEdit} disabled={editSaving} style={{ padding: '3px 15px', fontWeight: 'bold', fontSize: '13px', cursor: 'pointer', backgroundColor: 'cornflowerblue', color: 'white', border: 'none' }}>
-              {editSaving ? '저장중...' : '저장'}
-            </button>
-            <button onClick={() => setEditingOrder(null)} style={{ padding: '3px 15px', fontSize: '13px', cursor: 'pointer' }}>취소</button>
-          </div>
-        </div>
+        <OrderEditModal
+          open={!!editingOrder}
+          onClose={() => setEditingOrder(null)}
+          order={editingOrder}
+          customerName={(editingOrder as any).customer_name}
+          onEditComplete={() => {
+            setEditingOrder(null)
+            fetchOrders()
+          }}
+        />
       )}
 
       {/* 주문 목록 GridView */}
@@ -286,7 +231,7 @@ export default function OrdersPage() {
                 style={{
                   ...getRowStyle(order.status || ''),
                   cursor: 'pointer',
-                  outline: editingOrder?.order_id === order.order_id ? '2px solid orange' : 'none',
+                  outline: 'none',
                 }}
                 className="hover:opacity-80"
                 onClick={() => setSelectedOrder(order)}
@@ -321,7 +266,7 @@ export default function OrdersPage() {
       </div>
 
       {/* 주문 상세 */}
-      {selectedOrder && !editingOrder && (
+      {selectedOrder && (
         <div style={{ marginTop: '8px' }}>
           <OrderDetailPanel
             order={selectedOrder as any}

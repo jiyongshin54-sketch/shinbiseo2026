@@ -295,6 +295,112 @@ export async function POST(request: NextRequest) {
   }
 }
 
+// PUT /api/orders - 주문 수정 (마스터 + 디테일 전체 교체)
+export async function PUT(request: NextRequest) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  try {
+    const body = await request.json()
+    const {
+      seller_id, order_id, order_date, customer_id, ready_made,
+      item_count, sum_amount, adjustment, vat, total_amount,
+      payment_method, payment_date, comment, status,
+      items
+    } = body
+
+    if (!seller_id || !order_id) {
+      return NextResponse.json({ error: 'seller_id and order_id required' }, { status: 400 })
+    }
+
+    // 마스터 업데이트
+    const { error: masterError } = await supabase
+      .from('orders_m')
+      .update({
+        order_date,
+        customer_id,
+        ready_made,
+        item_count,
+        sum_amount,
+        adjustment,
+        vat,
+        total_amount,
+        payment_method: payment_method || '',
+        payment_date: payment_date || '',
+        comment: comment || '',
+        status,
+      })
+      .eq('seller_id', seller_id)
+      .eq('order_id', order_id)
+
+    if (masterError) throw masterError
+
+    // 기존 디테일 삭제
+    const { error: deleteError } = await supabase
+      .from('orders_d')
+      .delete()
+      .eq('seller_id', seller_id)
+      .eq('order_id', order_id)
+
+    if (deleteError) throw deleteError
+
+    // 삭제 완료 확인 (PK 충돌 방지)
+    const { data: remaining } = await supabase
+      .from('orders_d')
+      .select('sequence')
+      .eq('seller_id', seller_id)
+      .eq('order_id', order_id)
+      .limit(1)
+
+    if (remaining && remaining.length > 0) {
+      // 삭제가 아직 반영 안 된 경우 한번 더 삭제 시도
+      await supabase
+        .from('orders_d')
+        .delete()
+        .eq('seller_id', seller_id)
+        .eq('order_id', order_id)
+    }
+
+    // 새 디테일 삽입
+    if (items && items.length > 0) {
+      const detailRows = items.map((item: Record<string, unknown>, idx: number) => ({
+        seller_id,
+        order_id,
+        sequence: idx + 1,
+        category_id: item.category_id || '',
+        attribute01: item.attribute01 || '',
+        attribute02: item.attribute02 || '',
+        attribute03: item.attribute03 || '',
+        attribute04: item.attribute04 || '',
+        attribute05: item.attribute05 || '',
+        attribute06: item.attribute06 || '',
+        attribute07: item.attribute07 || '',
+        attribute08: item.attribute08 || '',
+        attribute09: item.attribute09 || '',
+        attribute10: item.attribute10 || '',
+        price: item.price || 0,
+        quantity: item.quantity || 0,
+        amount: item.amount || 0,
+        vat: item.vat || 0,
+        group: item.group || '',
+        status: item.status || '',
+      }))
+
+      const { error: detailError } = await supabase.from('orders_d').upsert(detailRows, {
+        onConflict: 'seller_id,order_id,sequence',
+      })
+      if (detailError) throw detailError
+    }
+
+    return NextResponse.json({ order_id })
+
+  } catch (error) {
+    console.error('PUT /api/orders error:', error)
+    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
+  }
+}
+
 function getStatusKey(status: string | null): number {
   if (!status) return 99
   if (status.includes('견적')) return 0

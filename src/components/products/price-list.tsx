@@ -1,8 +1,9 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useAuth } from '@/hooks/use-auth'
 import { toast } from 'sonner'
+import * as XLSX from 'xlsx'
 
 const GRADE_LABELS = [
   { label: '3.8급', field: 'unit_price01' },
@@ -43,6 +44,8 @@ export function PriceList() {
   const [editPrices, setEditPrices] = useState<Record<string, string>>({})
   const [editAttrs, setEditAttrs] = useState({ attribute01: '', attribute02: '', attribute03: '', attribute04: '', attribute05: '' })
   const [saving, setSaving] = useState(false)
+  const [uploading, setUploading] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   const fetchProducts = () => {
     if (!user) return
@@ -105,12 +108,140 @@ export function PriceList() {
     }
   }
 
+  // 엑셀 다운로드
+  const handleExcelDownload = () => {
+    if (products.length === 0) {
+      toast.error('다운로드할 데이터가 없습니다')
+      return
+    }
+
+    const rows = products.map((p: any) => {
+      const row: Record<string, any> = {
+        'ID': p.product_id,
+        '품명': p.attribute01 || '',
+        '색깔': p.attribute02 || '',
+        '두께': p.attribute03 || '',
+        '사이즈': p.attribute04 || '',
+        '마대량': p.attribute05 ? Number(p.attribute05) : '',
+      }
+      GRADE_LABELS.forEach(g => {
+        const val = p[g.field]
+        row[g.label] = val != null && Number(val) !== 0 ? Number(val) : ''
+      })
+      return row
+    })
+
+    const ws = XLSX.utils.json_to_sheet(rows)
+    ws['!cols'] = [
+      { wch: 8 }, { wch: 12 }, { wch: 8 }, { wch: 8 }, { wch: 12 }, { wch: 10 },
+      ...GRADE_LABELS.map(() => ({ wch: 8 })),
+    ]
+
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, '단가표')
+
+    const today = new Date().toISOString().slice(0, 10).replace(/-/g, '')
+    XLSX.writeFile(wb, `단가표_${today}.xlsx`)
+    toast.success('엑셀 다운로드 완료')
+  }
+
+  // 엑셀 업로드
+  const handleExcelUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file || !user) return
+    e.target.value = ''
+
+    setUploading(true)
+    try {
+      const data = await file.arrayBuffer()
+      const wb = XLSX.read(data)
+      const ws = wb.Sheets[wb.SheetNames[0]]
+      const rows = XLSX.utils.sheet_to_json<Record<string, any>>(ws)
+
+      if (rows.length === 0) {
+        toast.error('엑셀 파일에 데이터가 없습니다')
+        return
+      }
+
+      let successCount = 0
+      let errorCount = 0
+
+      for (const row of rows) {
+        const productId = String(row['ID'] || '').trim()
+        if (!productId) { errorCount++; continue }
+
+        const updateData: Record<string, any> = {}
+        if (row['품명'] !== undefined) updateData.attribute01 = String(row['품명'] || '')
+        if (row['색깔'] !== undefined) updateData.attribute02 = String(row['색깔'] || '')
+        if (row['두께'] !== undefined) updateData.attribute03 = String(row['두께'] || '')
+        if (row['사이즈'] !== undefined) updateData.attribute04 = String(row['사이즈'] || '')
+        if (row['마대량'] !== undefined) updateData.attribute05 = String(row['마대량'] || '')
+
+        GRADE_LABELS.forEach(g => {
+          const val = row[g.label]
+          if (val !== undefined && val !== '') {
+            updateData[g.field] = parseFloat(String(val)) || null
+          }
+        })
+
+        try {
+          const res = await fetch(`/api/products/${user.companyId}/${productId}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(updateData),
+          })
+          const result = await res.json()
+          if (result.error) { errorCount++; continue }
+          successCount++
+        } catch {
+          errorCount++
+        }
+      }
+
+      if (successCount > 0) {
+        toast.success(`${successCount}건 수정 완료${errorCount > 0 ? ` (${errorCount}건 실패)` : ''}`)
+        fetchProducts()
+      } else {
+        toast.error(`업로드 실패: ${errorCount}건 오류`)
+      }
+    } catch {
+      toast.error('엑셀 파일 읽기 실패')
+    } finally {
+      setUploading(false)
+    }
+  }
+
   const inputStyle: React.CSSProperties = { padding: '3px 6px', fontSize: '12px', border: '1px solid #ccc', width: '100%', textAlign: 'right' }
   const labelStyle: React.CSSProperties = { fontSize: '12px', fontWeight: 'bold', color: '#333', whiteSpace: 'nowrap' }
 
   return (
     <div>
-      <h3 style={{ fontSize: '14px', fontWeight: 'bold', margin: '5px 0' }}>기성품 단가표</h3>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', margin: '5px 0' }}>
+        <h3 style={{ fontSize: '14px', fontWeight: 'bold' }}>기성품 단가표</h3>
+        <div style={{ display: 'flex', gap: '6px' }}>
+          <button
+            onClick={handleExcelDownload}
+            disabled={products.length === 0}
+            style={{ padding: '4px 12px', fontSize: '12px', cursor: 'pointer', backgroundColor: '#16a34a', color: 'white', border: 'none', fontWeight: 'bold' }}
+          >
+            엑셀 다운로드
+          </button>
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            disabled={uploading}
+            style={{ padding: '4px 12px', fontSize: '12px', cursor: 'pointer', backgroundColor: '#ea580c', color: 'white', border: 'none', fontWeight: 'bold' }}
+          >
+            {uploading ? '업로드 중...' : '엑셀 업로드'}
+          </button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".xlsx,.xls"
+            onChange={handleExcelUpload}
+            style={{ display: 'none' }}
+          />
+        </div>
+      </div>
       <div style={{ maxHeight: 'calc(100vh - 200px)', overflowY: 'auto', overflowX: 'auto', border: '1px solid silver' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11px', minWidth: '1400px' }}>
           <thead>

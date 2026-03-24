@@ -25,9 +25,14 @@ interface Category {
 interface CustomOrderProps {
   fixedSellerId?: string
   fixedCustomerId?: string
+  editMode?: boolean
+  editOrderId?: string
+  editSellerId?: string
+  editCurrentStatus?: string
+  onEditComplete?: () => void
 }
 
-export function CustomOrder({ fixedSellerId, fixedCustomerId }: CustomOrderProps = {}) {
+export function CustomOrder({ fixedSellerId, fixedCustomerId, editMode, editOrderId, editSellerId, editCurrentStatus, onEditComplete }: CustomOrderProps = {}) {
   const { user, isSeller, isBuyer } = useAuth()
   const cart = useCartStore()
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -359,6 +364,11 @@ export function CustomOrder({ fixedSellerId, fixedCustomerId }: CustomOrderProps
                   buyerCompanyId={isBuyer ? user.companyId : undefined}
                   orderStatus={orderStatus}
                   onOrderStatusChange={isSeller ? (v) => setOrderStatus(v) : undefined}
+                  editMode={editMode}
+                  editOrderId={editOrderId}
+                  editSellerId={editSellerId}
+                  editCurrentStatus={editCurrentStatus}
+                  onEditComplete={onEditComplete}
                 />
               </div>
             </td>

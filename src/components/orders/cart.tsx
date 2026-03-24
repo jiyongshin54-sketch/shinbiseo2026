@@ -22,15 +22,86 @@ interface CartProps {
   buyerCompanyId?: string   // 구매회사 ID
   orderStatus: string
   onOrderStatusChange?: (status: string) => void
+  editMode?: boolean
+  editOrderId?: string
+  editSellerId?: string
+  editCurrentStatus?: string
+  onEditComplete?: () => void
 }
 
-export function Cart({ sellerId, customerId, buyerCompanyId, orderStatus, onOrderStatusChange }: CartProps) {
+const EDIT_STATUS_OPTIONS = ['주문', '견적', '견적 요청', '견적 응답', '준비됨', '수령', '완료', '취소']
+
+export function Cart({ sellerId, customerId, buyerCompanyId, orderStatus, onOrderStatusChange, editMode, editOrderId, editSellerId, editCurrentStatus, onEditComplete }: CartProps) {
   const { user, isSeller, isBuyer } = useAuth()
   const cart = useCartStore()
   const [submitting, setSubmitting] = useState(false)
+  const [editStatus, setEditStatus] = useState(editCurrentStatus || '주문')
 
   // 실제 customer_id 결정 (구매회사인 경우 contracts에서 가져와야 함)
   // 여기선 customerId prop 사용 (판매회사가 직접 선택한 경우)
+
+  const handleEditSubmit = async () => {
+    if (!editOrderId || !editSellerId) return
+    if (cart.items.length === 0) {
+      toast.error('장바구니가 비어있습니다.')
+      return
+    }
+
+    setSubmitting(true)
+    try {
+      const res = await fetch('/api/orders', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          seller_id: editSellerId,
+          order_id: editOrderId,
+          order_date: cart.orderDate,
+          customer_id: customerId || cart.customerId || '',
+          ready_made: cart.readyMade,
+          item_count: cart.items.length,
+          sum_amount: cart.getSumAmount(),
+          adjustment: cart.adjustmentSign === '-' ? -cart.adjustment : cart.adjustment,
+          vat: cart.getVatAmount(),
+          total_amount: cart.getTotalAmount(),
+          payment_method: '',
+          payment_date: '',
+          comment: cart.comment,
+          status: editStatus,
+          items: cart.items.map(item => ({
+            category_id: item.categoryId,
+            attribute01: item.attribute01,
+            attribute02: item.attribute02,
+            attribute03: item.attribute03,
+            attribute04: item.attribute04,
+            attribute05: item.attribute05,
+            attribute06: item.attribute06,
+            attribute07: item.attribute07,
+            attribute08: item.attribute08,
+            attribute09: item.attribute09,
+            attribute10: item.attribute10,
+            price: item.price,
+            quantity: item.quantity,
+            amount: item.amount,
+            vat: 0,
+            group: item.group,
+          })),
+        }),
+      })
+
+      const result = await res.json()
+      if (result.error) {
+        toast.error(result.error)
+      } else {
+        toast.success('주문이 수정되었습니다.')
+        cart.clearCart()
+        onEditComplete?.()
+      }
+    } catch {
+      toast.error('주문 수정 실패')
+    } finally {
+      setSubmitting(false)
+    }
+  }
 
   const handleSubmit = async () => {
     if (!sellerId) {
@@ -139,7 +210,25 @@ export function Cart({ sellerId, customerId, buyerCompanyId, orderStatus, onOrde
                   <td className="p-2">{item.attribute02}</td>
                   <td className="p-2">{item.attribute03}</td>
                   <td className="p-2">{item.attribute04}</td>
-                  <td className="p-2 text-right">{item.price.toLocaleString()}</td>
+                  <td className="p-2 text-right">
+                    {editMode ? (
+                      <Input
+                        type="number"
+                        step="0.1"
+                        className="h-7 w-20 text-right text-xs"
+                        value={item.price}
+                        onChange={(e) => {
+                          const newPrice = parseFloat(e.target.value) || 0
+                          cart.updateItem(item.sequence, {
+                            price: newPrice,
+                            amount: newPrice * item.quantity,
+                          })
+                        }}
+                      />
+                    ) : (
+                      item.price.toLocaleString()
+                    )}
+                  </td>
                   <td className="p-2 text-right">{item.quantity.toLocaleString()}</td>
                   <td className="p-2 text-right font-medium">{item.amount.toLocaleString()}</td>
                   <td className="p-2 text-center">
@@ -263,13 +352,35 @@ export function Cart({ sellerId, customerId, buyerCompanyId, orderStatus, onOrde
             <div className="text-lg font-bold">
               합계: {cart.getTotalAmount().toLocaleString()}원
             </div>
-            <Button
-              onClick={handleSubmit}
-              disabled={submitting}
-              className="mt-2"
-            >
-              {submitting ? '등록 중...' : `${isSeller ? orderStatus : '주문'} 등록`}
-            </Button>
+            {editMode ? (
+              <div className="flex items-center gap-2 mt-2">
+                <select
+                  value={editStatus}
+                  onChange={(e) => setEditStatus(e.target.value)}
+                  style={{ padding: '4px 8px', fontSize: '13px', border: '1px solid #ccc' }}
+                >
+                  {EDIT_STATUS_OPTIONS.map(s => (
+                    <option key={s} value={s}>{s}</option>
+                  ))}
+                </select>
+                <span style={{ fontSize: '13px', fontWeight: 'bold' }}>상태로</span>
+                <Button
+                  onClick={handleEditSubmit}
+                  disabled={submitting}
+                  style={{ backgroundColor: '#5b9bd5', minWidth: '120px' }}
+                >
+                  {submitting ? '수정 중...' : '주문 수정'}
+                </Button>
+              </div>
+            ) : (
+              <Button
+                onClick={handleSubmit}
+                disabled={submitting}
+                className="mt-2"
+              >
+                {submitting ? '등록 중...' : `${isSeller ? orderStatus : '주문'} 등록`}
+              </Button>
+            )}
           </div>
         </div>
       </CardContent>

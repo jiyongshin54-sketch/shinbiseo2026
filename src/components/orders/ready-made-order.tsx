@@ -32,13 +32,22 @@ interface SellerOption {
   customer_id: string
 }
 
-export function ReadyMadeOrder() {
+interface ReadyMadeOrderProps {
+  editMode?: boolean
+  editOrderId?: string
+  editSellerId?: string
+  editCurrentStatus?: string
+  fixedCustomerId?: string
+  onEditComplete?: () => void
+}
+
+export function ReadyMadeOrder({ editMode, editOrderId, editSellerId, editCurrentStatus, fixedCustomerId: fixedCustId, onEditComplete }: ReadyMadeOrderProps = {}) {
   const { user, isSeller, isBuyer } = useAuth()
   const cart = useCartStore()
 
   const [customers, setCustomers] = useState<Customer[]>([])
   const [sellers, setSellers] = useState<SellerOption[]>([])
-  const [selectedCustomerId, setSelectedCustomerId] = useState('')
+  const [selectedCustomerId, setSelectedCustomerId] = useState(fixedCustId || '')
   const [selectedSellerId, setSelectedSellerId] = useState('')
   const [searchKeyword, setSearchKeyword] = useState('')
   const [products, setProducts] = useState<ProductWithPrice[]>([])
@@ -261,6 +270,11 @@ export function ReadyMadeOrder() {
                 buyerCompanyId={isBuyer ? user.companyId : undefined}
                 orderStatus={orderStatus}
                 onOrderStatusChange={isSeller ? (v) => setOrderStatus(v) : undefined}
+                editMode={editMode}
+                editOrderId={editOrderId}
+                editSellerId={editSellerId}
+                editCurrentStatus={editCurrentStatus}
+                onEditComplete={onEditComplete}
               />
             </td>
           </tr>

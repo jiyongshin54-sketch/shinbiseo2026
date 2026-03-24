@@ -113,7 +113,24 @@ export function CompanyAnnouncementPanel({
               {companyName.substring(0, 2)}
             </div>
           )}
-          <span style={{ fontSize: '14px', fontWeight: 'bold', color: 'white' }}>{companyName} 공지사항</span>
+          <span style={{ fontSize: '14px', fontWeight: 'bold', color: 'white' }}>{companyName}</span>
+          <a
+            href={href}
+            style={{
+              marginLeft: 'auto',
+              padding: '3px 12px',
+              fontSize: '12px',
+              fontWeight: 'bold',
+              color: '#333',
+              backgroundColor: 'white',
+              border: '1px solid #ccc',
+              textDecoration: 'none',
+              cursor: 'pointer',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            바로가기
+          </a>
         </div>
       </div>
 
