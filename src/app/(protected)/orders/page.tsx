@@ -132,9 +132,9 @@ export default function OrdersPage() {
   }
 
   return (
-    <div>
+    <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 120px)' }}>
       {/* 구 앱 주문관리 2행 필터 (silver 배경) */}
-      <div style={{ backgroundColor: '#e8eef4', padding: '5px 8px', marginBottom: '2px', border: '1px solid #c0c8d0' }}>
+      <div style={{ backgroundColor: '#e8eef4', padding: '5px 8px', marginBottom: '2px', border: '1px solid #c0c8d0', flexShrink: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
           <span style={{ fontSize: '13px', fontWeight: 'bold', color: '#333' }}>구분:</span>
           <select value={viewMode} onChange={(e) => setViewMode(e.target.value)} style={ddlStyle}>
@@ -198,7 +198,7 @@ export default function OrdersPage() {
       )}
 
       {/* 주문 목록 GridView */}
-      <div style={{ maxHeight: '600px', overflowY: 'auto', border: '1px solid silver' }}>
+      <div style={{ flex: 1, minHeight: 0, overflowX: 'auto', overflowY: 'auto', border: '1px solid silver' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
           <thead>
             <tr style={{ backgroundColor: '#ccffcc' }}>
@@ -265,9 +265,21 @@ export default function OrdersPage() {
         </table>
       </div>
 
+      {/* 합계 바 */}
+      {orders.length > 0 && (
+        <div style={{ backgroundColor: '#f0f0f0', padding: '4px 8px', borderBottom: '1px solid #c0c8d0', borderLeft: '1px solid silver', borderRight: '1px solid silver', fontSize: '13px', fontWeight: 'bold', display: 'flex', alignItems: 'center', flexShrink: 0 }}>
+          <span>
+            총건수: {orders.length.toLocaleString()}개 | 총공급가: {orders.reduce((s, o) => s + Number(o.sum_amount || 0), 0).toLocaleString()}원 | 총부가세: {orders.reduce((s, o) => s + Number(o.vat || 0), 0).toLocaleString()}원 | 총합계금: {orders.reduce((s, o) => s + Number(o.total_amount || 0), 0).toLocaleString()}원
+          </span>
+          <span style={{ marginLeft: 'auto', fontSize: '13px', color: '#666', fontWeight: 'normal' }}>
+            일괄 처리를 하시려면 조회 시 거래처(구매회사), 상태(준비됨 또는 수령), 보기(주문별)로 조회하세요!
+          </span>
+        </div>
+      )}
+
       {/* 주문 상세 */}
       {selectedOrder && (
-        <div style={{ marginTop: '8px' }}>
+        <div style={{ marginTop: '8px', flexShrink: 0 }}>
           <OrderDetailPanel
             order={selectedOrder as any}
             onClose={() => setSelectedOrder(null)}

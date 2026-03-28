@@ -62,17 +62,21 @@ export async function GET(request: NextRequest) {
     // 풍원: 고객별 Level1/Level2로 등급별 단가 적용
     let level1 = '3.8급'
     let level2 = '3.8급'
+    let customerId = ''
+    let customerName = ''
 
     if (sellerId === PUNGWON_ID && buyerCompanyId) {
       // 풍원만 고객별 등급 조회
       const { data: customer } = await supabase
         .from('customers')
-        .select('customer_id, level1, level2')
+        .select('customer_id, customer_name, level1, level2')
         .eq('seller_id', sellerId)
         .eq('company_id', buyerCompanyId)
         .single()
 
       if (customer) {
+        customerId = customer.customer_id || ''
+        customerName = customer.customer_name || ''
         level1 = customer.level1 || '0.0급'
         level2 = customer.level2 || '0.0급'
       }
@@ -135,6 +139,8 @@ export async function GET(request: NextRequest) {
       unit_price_level1: priceCol1 ? Number(p[priceCol1]) || 0 : 0,  // 일반가 (0.0급이면 0원)
       unit_price_level2: priceCol2 ? Number(p[priceCol2]) || 0 : 0,  // 마대가 (0.0급이면 0원)
       madae_criteria: p.attribute05 ? parseInt(String(p.attribute05)) || 0 : 0,
+      customer_id: customerId,
+      customer_name: customerName,
       customer_level1: level1,
       customer_level2: level2,
     }))

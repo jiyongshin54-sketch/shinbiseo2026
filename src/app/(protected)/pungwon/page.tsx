@@ -20,6 +20,8 @@ interface ProductWithCategory extends Product {
   // 구매회사용 필드 (API가 buyer_company_id 전달 시 반환)
   unit_price_level1?: number
   unit_price_level2?: number
+  customer_id?: string
+  customer_name?: string
   customer_level1?: string
   customer_level2?: string
   madae_criteria?: number
@@ -258,20 +260,17 @@ export default function PungwonPage() {
   const inputStyle: React.CSSProperties = { padding: '3px 6px', fontSize: '12px', border: '1px solid #ccc', width: '100%', textAlign: 'right' }
   const labelStyle: React.CSSProperties = { fontSize: '12px', fontWeight: 'bold', color: '#333', whiteSpace: 'nowrap' }
 
-  // 구매회사의 등급 정보 (첫 번째 상품에서 가져옴)
-  const customerLevel1 = products[0]?.customer_level1
-  const customerLevel2 = products[0]?.customer_level2
 
   return (
-    <div>
+    <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 120px)' }}>
       {/* 헤더 */}
-      <div style={{ backgroundColor: '#003366', color: 'white', padding: '8px 15px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+      <div style={{ backgroundColor: '#003366', color: 'white', padding: '8px 15px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
         <span style={{ fontSize: '18px', fontWeight: 'bold' }}>풍원비닐포장 단가표</span>
         <span style={{ fontSize: '12px' }}>{user.userName}님 환영합니다</span>
       </div>
 
       {/* 검색바 */}
-      <div style={{ backgroundColor: '#e8eef4', padding: '5px 8px', borderBottom: '1px solid #c0c8d0', display: 'flex', alignItems: 'center', gap: '10px' }}>
+      <div style={{ backgroundColor: '#e8eef4', padding: '5px 8px', borderBottom: '1px solid #c0c8d0', display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0, flexWrap: 'wrap' }}>
         <span style={{ fontSize: '13px', fontWeight: 'bold' }}>검색:</span>
         <input
           type="text"
@@ -291,12 +290,6 @@ export default function PungwonPage() {
         <span style={{ fontSize: '12px', color: '#666', marginLeft: '10px' }}>
           총 {products.length}건
         </span>
-        {/* 구매회사인 경우 등급 표시 */}
-        {!canManage && customerLevel1 && (
-          <span style={{ fontSize: '12px', color: '#333', marginLeft: '10px', fontWeight: 'bold' }}>
-            일반등급: {customerLevel1} / 마대등급: {customerLevel2}
-          </span>
-        )}
         {/* 판매회사 관리자: 엑셀 다운로드/업로드 */}
         {canManage && (
           <div style={{ display: 'flex', gap: '6px', marginLeft: 'auto' }}>
@@ -326,7 +319,7 @@ export default function PungwonPage() {
       </div>
 
       {/* 단가표 테이블 */}
-      <div style={{ overflowX: 'auto', overflowY: 'auto', maxHeight: 'calc(100vh - 120px)', border: '1px solid silver' }}>
+      <div style={{ overflowX: 'auto', overflowY: 'auto', flex: 1, minHeight: 0, border: '1px solid silver' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11px' }}>
           <thead>
             <tr style={{ backgroundColor: '#ccffcc', position: 'sticky', top: 0, zIndex: 1 }}>
