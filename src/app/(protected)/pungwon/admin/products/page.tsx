@@ -16,6 +16,7 @@ interface ProductRow {
   attribute04: string | null
   attribute05: string | null
   stock: number | null
+  status: string | null
   [key: string]: unknown
 }
 
@@ -42,7 +43,7 @@ export default function PungwonAdminProductsPage() {
   const [editingProductId, setEditingProductId] = useState<string | null>(null)
   const [formOpen, setFormOpen] = useState(false)
   const [form, setForm] = useState<Record<string, string>>({
-    attribute01: '', attribute02: '', attribute03: '', attribute04: '', attribute05: '',
+    attribute01: '', attribute02: '', attribute03: '', attribute04: '', attribute05: '', status: '판매중',
     ...Object.fromEntries(GRADE_FIELDS.map(g => [g.field, ''])),
   })
   const [saving, setSaving] = useState(false)
@@ -66,7 +67,7 @@ export default function PungwonAdminProductsPage() {
   const openAddForm = () => {
     setEditingProductId(null)
     setForm({
-      attribute01: '', attribute02: '', attribute03: '', attribute04: '', attribute05: '',
+      attribute01: '', attribute02: '', attribute03: '', attribute04: '', attribute05: '', status: '판매중',
       ...Object.fromEntries(GRADE_FIELDS.map(g => [g.field, ''])),
     } as Record<string, string>)
     setFormOpen(true)
@@ -80,6 +81,7 @@ export default function PungwonAdminProductsPage() {
       attribute03: p.attribute03 || '',
       attribute04: p.attribute04 || '',
       attribute05: p.attribute05 || '',
+      status: p.status || '판매중',
       ...Object.fromEntries(GRADE_FIELDS.map(g => [g.field, String(p[g.field] || '')])),
     })
     setFormOpen(true)
@@ -103,6 +105,7 @@ export default function PungwonAdminProductsPage() {
         attribute03: form.attribute03,
         attribute04: form.attribute04,
         attribute05: form.attribute05,
+        status: form.status,
       }
       for (const g of GRADE_FIELDS) {
         payload[g.field] = parseFloat(form[g.field]) || 0
@@ -181,6 +184,7 @@ export default function PungwonAdminProductsPage() {
               <th style={thStyle}>두께</th>
               <th style={thStyle}>사이즈</th>
               <th style={thStyle}>마대량</th>
+              <th style={{ ...thStyle, textAlign: 'center' }}>상태</th>
               {GRADE_FIELDS.map(g => (
                 <th key={g.grade} style={{ ...thStyle, textAlign: 'right', fontSize: '11px' }}>{g.grade}</th>
               ))}
@@ -189,9 +193,9 @@ export default function PungwonAdminProductsPage() {
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={8 + GRADE_FIELDS.length} style={{ padding: '20px', textAlign: 'center' }}>로딩 중...</td></tr>
+              <tr><td colSpan={9 + GRADE_FIELDS.length} style={{ padding: '20px', textAlign: 'center' }}>로딩 중...</td></tr>
             ) : products.length === 0 ? (
-              <tr><td colSpan={8 + GRADE_FIELDS.length} style={{ padding: '20px', textAlign: 'center' }}>상품이 없습니다.</td></tr>
+              <tr><td colSpan={9 + GRADE_FIELDS.length} style={{ padding: '20px', textAlign: 'center' }}>상품이 없습니다.</td></tr>
             ) : products.map(p => (
               <tr key={p.product_id} style={{ borderBottom: '1px solid #ddd' }} className="hover:bg-gray-50">
                 <td style={{ ...tdStyle, textAlign: 'center' }}>{p.product_id}</td>
@@ -201,6 +205,7 @@ export default function PungwonAdminProductsPage() {
                 <td style={tdStyle}>{p.attribute03}</td>
                 <td style={tdStyle}>{p.attribute04}</td>
                 <td style={{ ...tdStyle, textAlign: 'right' }}>{p.attribute05}</td>
+                <td style={{ ...tdStyle, textAlign: 'center', color: p.status === '판매중' ? '#16a34a' : p.status === '일시품절' ? '#ea580c' : '#999' }}>{p.status || '판매중'}</td>
                 {GRADE_FIELDS.map(g => (
                   <td key={g.field} style={{ ...tdStyle, textAlign: 'right' }}>{Number(p[g.field] || 0).toLocaleString()}</td>
                 ))}
@@ -250,6 +255,15 @@ export default function PungwonAdminProductsPage() {
             <div>
               <div style={labelStyle}>카테고리 (자동)</div>
               <input value={form.attribute01 ? getCategoryId(form.attribute01) : ''} readOnly style={{ width: '60px', ...inputStyle, backgroundColor: '#eee' }} />
+            </div>
+            <div>
+              <div style={labelStyle}>상태</div>
+              <select value={form.status} onChange={e => updateField('status', e.target.value)} style={{ ...inputStyle, width: '90px' }}>
+                <option value="판매중">판매중</option>
+                <option value="일시품절">일시품절</option>
+                <option value="판매중지">판매중지</option>
+                <option value="삭제">삭제</option>
+              </select>
             </div>
           </div>
           {/* 등급별 단가 - 2행으로 분할 */}

@@ -141,6 +141,7 @@ export interface Product {
   modifier_id: string | null
   modify_time: string | null
   stock: number
+  status: string | null
 }
 
 export interface OrderMaster {

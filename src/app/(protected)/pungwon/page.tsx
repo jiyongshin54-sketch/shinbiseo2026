@@ -44,7 +44,7 @@ export default function PungwonPage() {
   // 관리 모달 상태
   const [editProduct, setEditProduct] = useState<any | null>(null)
   const [editPrices, setEditPrices] = useState<Record<string, string>>({})
-  const [editAttrs, setEditAttrs] = useState({ attribute01: '', attribute02: '', attribute03: '', attribute04: '', attribute05: '' })
+  const [editAttrs, setEditAttrs] = useState({ attribute01: '', attribute02: '', attribute03: '', attribute04: '', attribute05: '', status: '판매중' })
   const [saving, setSaving] = useState(false)
 
   const fetchProducts = useCallback(async () => {
@@ -103,6 +103,7 @@ export default function PungwonPage() {
       attribute03: p.attribute03 || '',
       attribute04: p.attribute04 || '',
       attribute05: p.attribute05 || '',
+      status: p.status || '판매중',
     })
   }
 
@@ -117,6 +118,7 @@ export default function PungwonPage() {
         attribute03: editAttrs.attribute03,
         attribute04: editAttrs.attribute04,
         attribute05: editAttrs.attribute05,
+        status: editAttrs.status,
       }
       GRADE_COLUMNS.forEach(g => {
         const key = g.field as string
@@ -330,6 +332,7 @@ export default function PungwonPage() {
               <th style={thStyle}>두께</th>
               <th style={thStyle}>사이즈</th>
               <th style={thStyle}>마대량</th>
+              {canManage && <th style={{ ...thStyle, textAlign: 'center' }}>상태</th>}
               {canManage ? (
                 // 판매회사: 전체 등급 컬럼
                 GRADE_COLUMNS.map(gc => (
@@ -349,9 +352,9 @@ export default function PungwonPage() {
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={canManage ? 8 + GRADE_COLUMNS.length : 9} style={{ padding: '30px', textAlign: 'center' }}>조회 중...</td></tr>
+              <tr><td colSpan={canManage ? 9 + GRADE_COLUMNS.length : 9} style={{ padding: '30px', textAlign: 'center' }}>조회 중...</td></tr>
             ) : products.length === 0 ? (
-              <tr><td colSpan={canManage ? 8 + GRADE_COLUMNS.length : 9} style={{ padding: '30px', textAlign: 'center' }}>상품이 없습니다</td></tr>
+              <tr><td colSpan={canManage ? 9 + GRADE_COLUMNS.length : 9} style={{ padding: '30px', textAlign: 'center' }}>상품이 없습니다</td></tr>
             ) : products.map(p => (
               <tr key={p.product_id} className="hover:bg-yellow-50">
                 {canManage && <td style={tdStyle}>{p.product_id}</td>}
@@ -361,6 +364,11 @@ export default function PungwonPage() {
                 <td style={{ ...tdStyle, textAlign: 'center' }}>{p.attribute03}</td>
                 <td style={{ ...tdStyle, textAlign: 'center' }}>{p.attribute04}</td>
                 <td style={{ ...tdStyle, textAlign: 'right' }}>{formatMadae(p.attribute05)}</td>
+                {canManage && (
+                  <td style={{ ...tdStyle, textAlign: 'center', fontSize: '10px', color: p.status === '판매중' ? '#16a34a' : p.status === '일시품절' ? '#ea580c' : '#999' }}>
+                    {p.status || '판매중'}
+                  </td>
+                )}
                 {canManage ? (
                   // 판매회사: 전체 등급 단가
                   GRADE_COLUMNS.map(gc => (
@@ -432,6 +440,15 @@ export default function PungwonPage() {
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                     <span style={labelStyle}>마대량:</span>
                     <input value={editAttrs.attribute05} onChange={e => setEditAttrs({ ...editAttrs, attribute05: e.target.value })} style={inputStyle} />
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <span style={labelStyle}>상태:</span>
+                    <select value={editAttrs.status} onChange={e => setEditAttrs({ ...editAttrs, status: e.target.value })} style={{ ...inputStyle, textAlign: 'left' }}>
+                      <option value="판매중">판매중</option>
+                      <option value="일시품절">일시품절</option>
+                      <option value="판매중지">판매중지</option>
+                      <option value="삭제">삭제</option>
+                    </select>
                   </div>
                 </div>
               </div>

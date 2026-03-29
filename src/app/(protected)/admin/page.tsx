@@ -30,7 +30,13 @@ interface PendingCompany {
   phone_number: string
 }
 
-type TabKey = 'users' | 'companies' | 'switch-company'
+type TabKey = 'users' | 'companies' | 'switch-company' | 'db-sync'
+
+interface SyncResult {
+  table: string
+  synced: number
+  error?: string
+}
 
 export default function AdminPage() {
   const { user, isSysAdmin, loading: authLoading } = useAuth()
@@ -45,6 +51,12 @@ export default function AdminPage() {
   const [companiesLoading, setCompaniesLoading] = useState(false)
   const [switchLoading, setSwitchLoading] = useState(false)
   const [switchingId, setSwitchingId] = useState<string | null>(null)
+
+  // DB 동기화 상태
+  const [syncing, setSyncing] = useState(false)
+  const [syncResults, setSyncResults] = useState<SyncResult[] | null>(null)
+  const [lastSyncTime, setLastSyncTime] = useState<string | null>(null)
+  const [syncTotalSynced, setSyncTotalSynced] = useState(0)
 
   const canAccess = isSysAdmin
 
@@ -177,6 +189,29 @@ export default function AdminPage() {
     }
   }
 
+  const runSync = async (mode: 'full' | 'incremental') => {
+    setSyncing(true)
+    setSyncResults(null)
+    try {
+      const res = await fetch('/api/admin/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode, lastSyncTime: mode === 'incremental' ? lastSyncTime : null }),
+      })
+      const data = await res.json()
+      if (data.error) throw new Error(data.error)
+      setSyncResults(data.results || [])
+      setSyncTotalSynced(data.totalSynced || 0)
+      setLastSyncTime(data.syncTime)
+      toast.success(`동기화 완료: ${data.totalSynced}건 (${mode === 'full' ? '전체' : '변경분'})`)
+    } catch (err) {
+      console.error('DB 동기화 오류:', err)
+      toast.error(err instanceof Error ? err.message : 'DB 동기화 실패')
+    } finally {
+      setSyncing(false)
+    }
+  }
+
   const switchCompany = async (targetCompanyId: string) => {
     if (!user) return
     setSwitchingId(targetCompanyId)
@@ -209,6 +244,7 @@ export default function AdminPage() {
     { key: 'users', label: '사용자 승인' },
     { key: 'companies', label: '회사 승인' },
     { key: 'switch-company', label: '회사 전환 (테스트)' },
+    { key: 'db-sync', label: 'DB 동기화' },
   ]
 
   return (
@@ -237,7 +273,9 @@ export default function AdminPage() {
               activeTab === key
                 ? key === 'switch-company'
                   ? 'border-orange-500 text-orange-700 bg-orange-50'
-                  : 'border-blue-500 text-blue-700 bg-blue-50'
+                  : key === 'db-sync'
+                    ? 'border-green-500 text-green-700 bg-green-50'
+                    : 'border-blue-500 text-blue-700 bg-blue-50'
                 : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50'
             }`}
           >
@@ -375,6 +413,85 @@ export default function AdminPage() {
               </table>
             )}
           </div>
+        </div>
+      )}
+
+      {/* DB 동기화 탭 */}
+      {activeTab === 'db-sync' && (
+        <div>
+          <div className="flex justify-between items-center mb-3">
+            <div>
+              <h2 className="text-base font-semibold">MySQL → Supabase 동기화</h2>
+              <p className="text-xs text-green-600 mt-1">AWS RDS MySQL 데이터를 Supabase PostgreSQL로 동기화합니다.</p>
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => runSync('incremental')}
+                disabled={syncing || !lastSyncTime}
+                className="px-4 py-1.5 bg-green-600 hover:bg-green-700 disabled:bg-green-300 text-white rounded text-xs font-bold"
+              >
+                {syncing ? '동기화 중...' : '변경분 동기화'}
+              </button>
+              <button
+                onClick={() => runSync('full')}
+                disabled={syncing}
+                className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 text-white rounded text-xs font-bold"
+              >
+                {syncing ? '동기화 중...' : '전체 동기화'}
+              </button>
+            </div>
+          </div>
+
+          {lastSyncTime && (
+            <div className="mb-3 px-3 py-2 bg-gray-50 border rounded text-xs text-gray-600">
+              마지막 동기화: <span className="font-medium text-gray-800">{new Date(lastSyncTime).toLocaleString('ko-KR')}</span>
+              {' | '}총 {syncTotalSynced.toLocaleString()}건 동기화
+            </div>
+          )}
+
+          {syncing && (
+            <div className="p-6 text-center text-gray-500">
+              <div className="text-lg mb-2">동기화 진행 중...</div>
+              <div className="text-xs">MySQL에서 데이터를 읽어 Supabase로 전송 중입니다. 잠시 기다려주세요.</div>
+            </div>
+          )}
+
+          {syncResults && !syncing && (
+            <div className="bg-white border rounded overflow-hidden">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50 border-b">
+                  <tr>
+                    <th className="px-4 py-2 text-left text-xs text-gray-500">테이블</th>
+                    <th className="px-4 py-2 text-right text-xs text-gray-500">동기화 건수</th>
+                    <th className="px-4 py-2 text-left text-xs text-gray-500">상태</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y">
+                  {syncResults.map(r => (
+                    <tr key={r.table} className="hover:bg-gray-50">
+                      <td className="px-4 py-2 font-medium">{r.table}</td>
+                      <td className="px-4 py-2 text-right">{r.synced.toLocaleString()}건</td>
+                      <td className="px-4 py-2">
+                        {r.error ? (
+                          <span className="px-2 py-0.5 text-xs bg-red-100 text-red-800 rounded-full">{r.error}</span>
+                        ) : r.synced > 0 ? (
+                          <span className="px-2 py-0.5 text-xs bg-green-100 text-green-800 rounded-full">완료</span>
+                        ) : (
+                          <span className="px-2 py-0.5 text-xs bg-gray-100 text-gray-600 rounded-full">변경 없음</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {!syncResults && !syncing && (
+            <div className="p-6 text-center text-gray-400 border rounded bg-white">
+              동기화 버튼을 클릭하면 결과가 여기에 표시됩니다.
+            </div>
+          )}
         </div>
       )}
 
