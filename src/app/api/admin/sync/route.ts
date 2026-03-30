@@ -152,7 +152,7 @@ async function syncTable(
 
   for (let i = 0; i < rows.length; i += BATCH_SIZE) {
     const batch = rows.slice(i, i + BATCH_SIZE)
-    const mappedRows = batch.map(row => mapRow(row, config.columns))
+    const mappedRows = batch.map(row => mapRow(row, config.columns as Record<string, string>))
 
     // Supabase upsert
     const { error } = await supabase
