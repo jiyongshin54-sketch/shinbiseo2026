@@ -92,6 +92,8 @@ export function ReadyMadeOrder({ editMode, editOrderId, editSellerId, editCurren
       if (activeCustomerId) {
         const customer = customers.find(c => c.customer_id === activeCustomerId)
         if (customer?.company_id) params.set('buyer_company_id', customer.company_id)
+        // company_id가 없어도 customer_id로 등급 조회 가능하도록
+        params.set('customer_id', activeCustomerId)
       }
       if (searchKeyword) params.set('search', searchKeyword)
       const res = await fetch(`/api/products?${params}`)

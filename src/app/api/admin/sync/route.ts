@@ -86,16 +86,18 @@ function getMysqlConnection() {
     user: process.env.MYSQL_USER,
     password: process.env.MYSQL_PASSWORD,
     charset: 'utf8mb4',
+    dateStrings: false,
+    timezone: '+09:00',
   })
 }
 
 function convertValue(val: unknown): unknown {
   if (val === null || val === undefined) return null
   if (val instanceof Date) {
-    // 0000-00-00 00:00:00 처리
-    if (val.getFullYear() <= 1970) return null
+    if (isNaN(val.getTime()) || val.getFullYear() <= 1970) return null
     return val.toISOString()
   }
+  if (typeof val === 'string' && val.startsWith('0000-00-00')) return null
   return val
 }
 

@@ -18,6 +18,7 @@ export async function GET(request: NextRequest) {
   const categoryM = params.get('category_m')
   const getCategories = params.get('get_categories')
   const priceList = params.get('price_list')
+  const customerIdParam = params.get('customer_id')
 
   // 카테고리 목록만 반환
   if (getCategories === 'true') {
@@ -65,8 +66,23 @@ export async function GET(request: NextRequest) {
     let customerId = ''
     let customerName = ''
 
-    if (sellerId === PUNGWON_ID && buyerCompanyId) {
-      // 풍원만 고객별 등급 조회
+    if (sellerId === PUNGWON_ID && customerIdParam) {
+      // customer_id로 등급 조회
+      const { data: customer } = await supabase
+        .from('customers')
+        .select('customer_id, customer_name, level1, level2')
+        .eq('seller_id', sellerId)
+        .eq('customer_id', customerIdParam)
+        .single()
+
+      if (customer) {
+        customerId = customer.customer_id || ''
+        customerName = customer.customer_name || ''
+        level1 = customer.level1 || '0.0급'
+        level2 = customer.level2 || '0.0급'
+      }
+    } else if (sellerId === PUNGWON_ID && buyerCompanyId) {
+      // 구매회사 로그인 시 company_id → customer_id 찾아서 등급 조회
       const { data: customer } = await supabase
         .from('customers')
         .select('customer_id, customer_name, level1, level2')
@@ -80,8 +96,8 @@ export async function GET(request: NextRequest) {
         level1 = customer.level1 || '0.0급'
         level2 = customer.level2 || '0.0급'
       }
-    } else if (sellerId === PUNGWON_ID && !buyerCompanyId) {
-      // 풍원인데 구매회사 미지정 → 등급 미확정
+    } else if (sellerId === PUNGWON_ID) {
+      // 풍원인데 구매회사/거래처 미지정 → 등급 미확정
       level1 = '0.0급'
       level2 = '0.0급'
     }
